@@ -1,7 +1,7 @@
 import { ethers } from "ethers";
 
 export const FLARE_CONFIG = {
-  // Đã chuẩn hóa lại toàn bộ chữ hoa/thường:
+  // Sử dụng ethers.getAddress để tự động sửa lỗi viết hoa/thường
   WNAT: ethers.getAddress("0x1D80c49BbBCd1C0911346656B529DF9E5c2F783d"),
   REWARD_MANAGER: ethers.getAddress("0x8560103b1D479d4961F7A8878071c51F3a94f67D"), 
   CLAIM_SETUP_MANAGER: ethers.getAddress("0x0A97607593c6A2B3eA80687794121F762886A87C"), 
