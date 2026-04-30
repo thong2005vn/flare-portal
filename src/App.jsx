@@ -28,7 +28,7 @@ export default function FlarePortal() {
       const wnat = new ethers.Contract(FLARE_CONFIG.WNAT, ABIS.WNAT, p);
       const rew = new ethers.Contract(FLARE_CONFIG.REWARD_MANAGER, ABIS.REWARD_MANAGER, p);
 
-      // Lấy số dư FLR, WFLR và phần thưởng song song để tối ưu tốc độ
+      // Lấy số dư FLR, WFLR và phần thưởng song song
       const [f, w, pw, rewardStates] = await Promise.all([
         p.getBalance(addr),
         wnat.balanceOf(addr),
@@ -38,14 +38,14 @@ export default function FlarePortal() {
 
       const del = await wnat.delegatesOf(pda).catch(() => [[], [], 0n, 0n]);
       
-      // Tính toán tổng phần thưởng từ các Epoch
+      // Tính toán tổng phần thưởng
       let totalRewardWei = 0n;
       if (Array.isArray(rewardStates)) {
         rewardStates.forEach(epochArray => {
-          if (epochArray) {
-            epochArray.forEach(state => { 
-              totalRewardWei += state.amount ? BigInt(state.amount) : 0n; 
-            });
+          if (epochArray && Array.isArray(epochArray)) {
+             epochArray.forEach(state => { 
+               totalRewardWei += state.amount ? BigInt(state.amount) : 0n; 
+             });
           }
         });
       }
@@ -105,8 +105,10 @@ export default function FlarePortal() {
   const connect = async () => {
     if (!window.ethereum) return alert("Vui lòng cài đặt MetaMask!");
     try {
+      const p = getProvider();
       const accs = await window.ethereum.request({ method: "eth_requestAccounts" });
-      const csm = new ethers.Contract(FLARE_CONFIG.CLAIM_SETUP_MANAGER, ABIS.CLAIM_SETUP_MANAGER, await getProvider().getSigner());
+      const signer = await p.getSigner();
+      const csm = new ethers.Contract(FLARE_CONFIG.CLAIM_SETUP_MANAGER, ABIS.CLAIM_SETUP_MANAGER, signer);
       const pda = await csm.accountToDelegationAccount(accs[0]);
       setAccount(accs[0]);
       setPdaAddress(pda);
@@ -170,7 +172,6 @@ export default function FlarePortal() {
         <button onClick={connect} style={{...styles.btn, width:'100%', background: COLORS.PINK, color:'white', fontSize: '14px', height: '55px'}}>KẾT NỐI VÍ METAMASK</button>
       ) : (
         <>
-          {/* PHẦN VÍ CHÍNH */}
           <section style={styles.card}>
             <div style={styles.label}>VÍ CHÍNH (WALLET)</div>
             <div style={{display:'flex', justifyContent:'space-between', marginBottom:15, fontSize:18, fontWeight:'bold'}}>
@@ -188,7 +189,6 @@ export default function FlarePortal() {
             </div>
           </section>
 
-          {/* TÀI KHOẢN ỦY QUYỀN - PDA */}
           <section style={{...styles.card, border: `1px solid ${COLORS.PINK}33`}}>
             <div style={{...styles.label, color: COLORS.PINK}}>TÀI KHOẢN ỦY QUYỀN (PDA)</div>
             <div style={{fontSize:24, fontWeight:'900', marginBottom:15}}>{Number(balances.pdaWflr).toLocaleString()} <small style={{fontSize:10, color: COLORS.TEXT_MUTE}}>WFLR</small></div>
@@ -207,7 +207,6 @@ export default function FlarePortal() {
             </div>
           </section>
 
-          {/* DANH SÁCH ỦY QUYỀN */}
           <section style={styles.card}>
             <div style={styles.label}>ĐANG ỦY QUYỀN ({delegations.length}/2)</div>
             {delegations.length === 0 && <div style={{fontSize: 12, color: COLORS.TEXT_MUTE, textAlign: 'center', padding: '10px 0'}}>Chưa có ủy quyền nào</div>}
@@ -221,7 +220,6 @@ export default function FlarePortal() {
               </div>
             ))}
             
-            {/* TÌM KIẾM PROVIDER */}
             <div style={{position:'relative', marginTop:15}}>
                 <input 
                   type="text" 
