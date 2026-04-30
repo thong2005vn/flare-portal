@@ -1,6 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { ethers } from "ethers";
-// Import các hằng số từ file constants.js cùng thư mục src
 import { FLARE_CONFIG, ABIS, PROVIDERS, COLORS } from "./constants";
 
 export default function FlarePortal() {
@@ -13,66 +12,15 @@ export default function FlarePortal() {
   const [status, setStatus] = useState("Sẵn sàng");
   const [providerSearch, setProviderSearch] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
-  
-  // State mới cho đồng hồ đếm ngược
   const [countdown, setCountdown] = useState("");
 
-  // Khởi tạo Provider kết nối với MetaMask
+  // 1. Khởi tạo Provider - Ethers v6 BrowserProvider
   const getProvider = useCallback(() => {
-    if (!window.ethereum) return null;
+    if (typeof window === "undefined" || !window.ethereum) return null;
     return new ethers.BrowserProvider(window.ethereum);
   }, []);
 
-  // Logic đếm ngược Epoch
-  const initCountdown = useCallback(async () => {
-    try {
-      const p = getProvider();
-      if (!p) return;
-      
-      const ftso = new ethers.Contract(FLARE_CONFIG.FTSO_MANAGER, ABIS.FTSO_MANAGER, p);
-      
-      // Lấy cấu hình từ Smart Contract
-      const [startTs, duration] = await ftso.getRewardEpochConfiguration();
-      const currentEpoch = await ftso.getCurrentRewardEpoch();
-      
-      // Thời điểm kết thúc Epoch hiện tại = Start + (Current + 1) * Duration
-      const endTs = Number(startTs) + (Number(currentEpoch) + 1) * Number(duration);
-      
-      const updateTick = () => {
-        const now = Math.floor(Date.now() / 1000);
-        const diff = endTs - now;
-        
-        if (diff <= 0) {
-          setCountdown("Đang chuyển Epoch...");
-          return;
-        }
-        
-        const d = Math.floor(diff / 86400);
-        const h = Math.floor((diff % 86400) / 3600);
-        const m = Math.floor((diff % 3600) / 60);
-        const s = diff % 60;
-        
-        setCountdown(`${d}d ${h}h ${m}m ${s}s`);
-      };
-
-      updateTick();
-      const interval = setInterval(updateTick, 1000);
-      return interval;
-    } catch (e) {
-      console.error("Lỗi khởi tạo đếm ngược:", e);
-    }
-  }, [getProvider]);
-
-  // Khởi chạy đếm ngược khi có tài khoản
-  useEffect(() => {
-    let timer;
-    if (account) {
-      initCountdown().then(t => timer = t);
-    }
-    return () => clearInterval(timer);
-  }, [account, initCountdown]);
-
-  // Hàm cập nhật toàn bộ dữ liệu số dư và ủy quyền
+  // 2. Logic cập nhật số liệu - Tối ưu bằng Promise.all để không treo UI
   const refreshData = useCallback(async (addr, pda) => {
     if (!addr || !pda) return;
     try {
@@ -92,9 +40,9 @@ export default function FlarePortal() {
       let totalRewardWei = 0n;
       if (Array.isArray(rewardStates)) {
         rewardStates.forEach(epochArray => {
-          if (epochArray) {
-            epochArray.forEach(state => { 
-              totalRewardWei += state.amount ? BigInt(state.amount) : 0n; 
+          if (epochArray && epochArray.rewardStates) {
+            epochArray.rewardStates.forEach(state => { 
+              totalRewardWei += state.rewardAmounts[0] ? BigInt(state.rewardAmounts[0]) : 0n; 
             });
           }
         });
@@ -125,6 +73,75 @@ export default function FlarePortal() {
     }
   }, [getProvider]);
 
+  // 3. Logic Đếm ngược Epoch - Tránh treo UI khi khởi tạo
+  const initCountdown = useCallback(async () => {
+    try {
+      const p = getProvider();
+      if (!p) return;
+      
+      const ftso = new ethers.Contract(FLARE_CONFIG.FTSO_MANAGER, ABIS.FTSO_MANAGER, p);
+      const [config, currentEpoch] = await Promise.all([
+        ftso.getRewardEpochConfiguration(),
+        ftso.getCurrentRewardEpoch()
+      ]);
+      
+      const startTs = Number(config[0]);
+      const duration = Number(config[1]);
+      const endTs = startTs + (Number(currentEpoch) + 1) * duration;
+      
+      const updateTick = () => {
+        const now = Math.floor(Date.now() / 1000);
+        const diff = endTs - now;
+        if (diff <= 0) {
+          setCountdown("Đang chuyển Epoch...");
+          return;
+        }
+        const d = Math.floor(diff / 86400);
+        const h = Math.floor((diff % 86400) / 3600);
+        const m = Math.floor((diff % 3600) / 60);
+        const s = diff % 60;
+        setCountdown(`${d}d ${h}h ${m}m ${s}s`);
+      };
+
+      updateTick();
+      return setInterval(updateTick, 1000);
+    } catch (e) {
+      console.error("Lỗi đếm ngược:", e);
+      setCountdown("Cần tải lại...");
+    }
+  }, [getProvider]);
+
+  // 4. Hàm Kết nối Ví - Đã sửa lỗi kẹt UI
+  const connect = async () => {
+    if (!window.ethereum) return alert("Vui lòng cài đặt MetaMask!");
+    try {
+      setStatus("⏳ Đang kết nối...");
+      const accs = await window.ethereum.request({ method: "eth_requestAccounts" });
+      const provider = getProvider();
+      const signer = await provider.getSigner(); // Quan trọng: await signer trong v6
+      
+      const csm = new ethers.Contract(FLARE_CONFIG.CLAIM_SETUP_MANAGER, ABIS.CLAIM_SETUP_MANAGER, signer);
+      const pda = await csm.accountToDelegationAccount(accs[0]);
+      
+      setAccount(accs[0]);
+      setPdaAddress(pda);
+      refreshData(accs[0], pda);
+      setStatus("Sẵn sàng");
+    } catch (e) {
+      console.error(e);
+      setStatus("❌ Kết nối ví thất bại");
+    }
+  };
+
+  // 5. Effects
+  useEffect(() => {
+    let timer;
+    if (account) {
+      initCountdown().then(t => timer = t);
+    }
+    return () => { if (timer) clearInterval(timer); };
+  }, [account, initCountdown]);
+
   useEffect(() => {
     if (account && pdaAddress) {
       const interval = setInterval(() => refreshData(account, pdaAddress), 30000);
@@ -132,6 +149,7 @@ export default function FlarePortal() {
     }
   }, [account, pdaAddress, refreshData]);
 
+  // 6. Giao dịch
   const execute = async (label, action) => {
     try {
       setStatus(`⏳ ${label}...`);
@@ -145,53 +163,38 @@ export default function FlarePortal() {
       }
     } catch (e) {
       console.error(e);
-      setStatus(`❌ Lỗi: ${e.reason || "Giao dịch thất bại"}`);
-    }
-  };
-
-  const connect = async () => {
-    if (!window.ethereum) return alert("Vui lòng cài đặt MetaMask!");
-    try {
-      const accs = await window.ethereum.request({ method: "eth_requestAccounts" });
-      const signer = await (await getProvider()).getSigner();
-      const csm = new ethers.Contract(FLARE_CONFIG.CLAIM_SETUP_MANAGER, ABIS.CLAIM_SETUP_MANAGER, signer);
-      const pda = await csm.accountToDelegationAccount(accs[0]);
-      setAccount(accs[0]);
-      setPdaAddress(pda);
-      refreshData(accs[0], pda);
-    } catch (e) {
-      setStatus("❌ Kết nối ví thất bại");
+      setStatus(`❌ ${e.reason || "Lỗi giao dịch"}`);
     }
   };
 
   const handleWrap = (isWrap) => execute(isWrap ? "Wrap" : "Unwrap", async () => {
-    const s = await (getProvider()).getSigner();
+    const s = await getProvider().getSigner();
     const w = new ethers.Contract(FLARE_CONFIG.WNAT, ABIS.WNAT, s);
     const val = ethers.parseEther(walletAmount || "0");
     return isWrap ? w.deposit({ value: val }) : w.withdraw(val);
   });
 
   const handleToPDA = () => execute("Nạp vào PDA", async () => {
-    const s = await (getProvider()).getSigner();
+    const s = await getProvider().getSigner();
     const w = new ethers.Contract(FLARE_CONFIG.WNAT, ABIS.WNAT, s);
     return w.transfer(pdaAddress, ethers.parseEther(walletAmount || "0"));
   });
 
   const handleWithdrawPDA = () => execute("Rút từ PDA", async () => {
-    const s = await (getProvider()).getSigner();
+    const s = await getProvider().getSigner();
     const csm = new ethers.Contract(FLARE_CONFIG.CLAIM_SETUP_MANAGER, ABIS.CLAIM_SETUP_MANAGER, s);
     return csm.withdraw(ethers.parseEther(pdaAmount || "0"));
   });
 
   const handleClaim = () => execute("Nhận thưởng", async () => {
-    const s = await (getProvider()).getSigner();
+    const s = await getProvider().getSigner();
     const r = new ethers.Contract(FLARE_CONFIG.REWARD_MANAGER, ABIS.REWARD_MANAGER, s);
     const [, end] = await r.getRewardEpochIdsWithClaimableRewards();
     return r.claim(pdaAddress, pdaAddress, end, true, []);
   });
 
   const handleDelegate = (target, pct = 50) => execute(pct === 0 ? "Hủy ủy quyền" : "Ủy quyền", async () => {
-    const s = await (getProvider()).getSigner();
+    const s = await getProvider().getSigner();
     const w = new ethers.Contract(FLARE_CONFIG.WNAT, ABIS.WNAT, s);
     return w.delegate(target, pct * 100);
   });
@@ -200,12 +203,13 @@ export default function FlarePortal() {
     PROVIDERS.filter(p => p.name.toLowerCase().includes(providerSearch.toLowerCase())), 
   [providerSearch]);
 
+  // UI Styles (Giữ nguyên phong cách Dark Mode của bạn)
   const styles = {
     container: { boxSizing: 'border-box', padding: "12px", width: "100%", maxWidth: "450px", margin: "0 auto", background: COLORS.DARK, color: "white", minHeight: "100vh", fontFamily: "-apple-system, sans-serif" },
     card: { background: COLORS.SURFACE, padding: "16px", borderRadius: "20px", marginBottom: "12px", border: "1px solid #1f1f1f" },
     label: { fontSize: "10px", color: COLORS.TEXT_MUTE, fontWeight: "800", marginBottom: "8px", textTransform: "uppercase" },
     input: { flex: 1, padding: "12px", borderRadius: "12px", background: "#080808", color: "white", border: "1px solid #222", fontSize: "16px", width: "100%" },
-    btn: { padding: "12px", borderRadius: "12px", border: "none", cursor: "pointer", fontWeight: "bold", fontSize: "12px", transition: '0.2s' },
+    btn: { padding: "12px", borderRadius: "12px", border: "none", cursor: "pointer", fontWeight: "bold", fontSize: "12px" },
     timerBox: { background: 'rgba(255, 255, 255, 0.03)', padding: '10px 15px', borderRadius: '12px', marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(255,255,255,0.05)' }
   };
 
@@ -219,7 +223,6 @@ export default function FlarePortal() {
         <button onClick={connect} style={{...styles.btn, width:'100%', background: COLORS.PINK, color:'white', fontSize: '14px', height: '55px'}}>KẾT NỐI VÍ METAMASK</button>
       ) : (
         <>
-          {/* PHẦN VÍ CHÍNH */}
           <section style={styles.card}>
             <div style={styles.label}>VÍ CHÍNH (WALLET)</div>
             <div style={{display:'flex', justifyContent:'space-between', marginBottom:15, fontSize:18, fontWeight:'bold'}}>
@@ -237,17 +240,13 @@ export default function FlarePortal() {
             </div>
           </section>
 
-          {/* TÀI KHOẢN ỦY QUYỀN - PDA */}
           <section style={{...styles.card, border: `1px solid ${COLORS.PINK}33`}}>
             <div style={{...styles.label, color: COLORS.PINK}}>TÀI KHOẢN ỦY QUYỀN (PDA)</div>
             <div style={{fontSize:24, fontWeight:'900', marginBottom:15}}>{Number(balances.pdaWflr).toLocaleString()} <small style={{fontSize:10, color: COLORS.TEXT_MUTE}}>WFLR</small></div>
             
-            {/* ĐỒNG HỒ ĐẾM NGƯỢC */}
             <div style={styles.timerBox}>
                 <span style={{fontSize: '9px', color: COLORS.TEXT_MUTE, fontWeight: '800'}}>KẾT THÚC EPOCH TRONG</span>
-                <span style={{fontSize: '14px', color: COLORS.AMBER, fontFamily: 'monospace', fontWeight: '900'}}>
-                    {countdown || "LÀM MỚI..."}
-                </span>
+                <span style={{fontSize: '14px', color: COLORS.AMBER, fontFamily: 'monospace', fontWeight: '900'}}>{countdown || "LÀM MỚI..."}</span>
             </div>
 
             <div style={{display:'flex', gap:8, marginBottom:10}}>
@@ -261,35 +260,26 @@ export default function FlarePortal() {
                     <div style={{fontSize:10, color: COLORS.TEXT_MUTE, fontWeight:'bold'}}>PHẦN THƯỞNG CHỜ NHẬN</div>
                     <div style={{color: COLORS.PINK, fontSize:18, fontWeight:'900'}}>+{Number(balances.reward).toFixed(2)} FLR</div>
                 </div>
-                <button onClick={handleClaim} style={{...styles.btn, background: COLORS.PINK, color:'white', padding: '10px 20px', boxShadow: `0 4px 15px ${COLORS.PINK}44`}}>CLAIM</button>
+                <button onClick={handleClaim} style={{...styles.btn, background: COLORS.PINK, color:'white', padding: '10px 20px'}}>CLAIM</button>
             </div>
           </section>
 
-          {/* DANH SÁCH ỦY QUYỀN */}
           <section style={styles.card}>
             <div style={styles.label}>ĐANG ỦY QUYỀN ({delegations.length}/2)</div>
-            {delegations.length === 0 && <div style={{fontSize: 12, color: COLORS.TEXT_MUTE, textAlign: 'center', padding: '10px 0'}}>Chưa có ủy quyền nào</div>}
             {delegations.map((d, i) => (
               <div key={i} style={{display:'flex', justifyContent:'space-between', padding:'12px 0', borderBottom: i === delegations.length - 1 ? 'none' : '1px solid #222'}}>
                 <div>
                   <div style={{fontWeight:'bold', fontSize:14}}>{d.name}</div>
                   <div style={{fontSize:11, color: COLORS.PINK, fontWeight:'bold'}}>{d.pct}% Power</div>
                 </div>
-                <button onClick={()=>handleDelegate(d.addr, 0)} style={{background:'#ff444422', border:'none', color:'#ff4444', borderRadius:10, padding:'5px 12px', fontWeight:'bold'}}>✕ GỠ</button>
+                <button onClick={()=>handleDelegate(d.addr, 0)} style={{background:'#ff444422', border:'none', color:'#ff4444', borderRadius:10, padding:'5px 12px'}}>✕ GỠ</button>
               </div>
             ))}
             
             <div style={{position:'relative', marginTop:15}}>
-                <input 
-                  type="text" 
-                  placeholder="Tìm & Thêm FTSO Provider..." 
-                  value={providerSearch} 
-                  onFocus={()=>setShowDropdown(true)} 
-                  onChange={(e)=>setProviderSearch(e.target.value)} 
-                  style={styles.input}
-                />
+                <input type="text" placeholder="Tìm & Thêm FTSO Provider..." value={providerSearch} onFocus={()=>setShowDropdown(true)} onChange={(e)=>setProviderSearch(e.target.value)} style={styles.input}/>
                 {showDropdown && (
-                    <div style={{position:'absolute', bottom:'110%', left:0, right:0, background:'#181818', borderRadius:15, border:'1px solid #333', maxHeight:160, overflowY:'auto', zIndex:100, boxShadow: '0 -10px 20px rgba(0,0,0,0.5)'}}>
+                    <div style={{position:'absolute', bottom:'110%', left:0, right:0, background:'#181818', borderRadius:15, border:'1px solid #333', maxHeight:160, overflowY:'auto', zIndex:100}}>
                         {filteredProviders.map(p => (
                             <div key={p.address} onClick={()=>{handleDelegate(p.address, 50); setShowDropdown(false);}} style={{padding:12, borderBottom:'1px solid #222', fontSize:13, display:'flex', justifyContent:'space-between', cursor:'pointer'}}>
                                 <span>{p.name}</span>
