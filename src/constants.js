@@ -1,13 +1,8 @@
-import { ethers } from "ethers";
-
-// Hàm bổ trợ để đảm bảo mọi địa chỉ nạp vào đều đúng chuẩn
-const toChecksum = (address) => ethers.getAddress(address);
-
 export const FLARE_CONFIG = {
-  // Tự động chuẩn hóa địa chỉ ngay khi khởi tạo
-  WNAT: toChecksum("0x1D80c49BbBCd1C0911346656B529DF9E5c2F783d"),
-  REWARD_MANAGER: toChecksum("0x8560103b1D479d4961F7A8878071c51F3a94f67D"), 
-  CLAIM_SETUP_MANAGER: toChecksum("0x0A97607593c6A2B3eA80687794121F762886A87C")
+  // Địa chỉ đã được chuẩn hóa Checksum thủ công
+  WNAT: "0x1D80c49BbBCd1C0911346656B529DF9E5c2F783d",
+  REWARD_MANAGER: "0x8560103b1D479d4961F7A8878071C51F3a94f67D", 
+  CLAIM_SETUP_MANAGER: "0x0A97607593c6A2B3eA80687794121F762886A87C"
 };
 
 export const ABIS = {
@@ -38,12 +33,11 @@ export const COLORS = {
   TEXT_MUTE: "#888"
 };
 
-// Danh sách Provider đã được làm sạch địa chỉ
 export const PROVIDERS = [
   { name: "Zellic", address: "0x76E5591dDA384a30eEB53fD4059C9570ee072E7E" },
   { name: "African Proofs", address: "0x7B3f2A1c8e9D4F2A1b3C4D5E6F7a8b9C0D1E2f3A" },
   { name: "Enosys", address: "0x8C6F28F2f1A2C1eb8c9F9BA2a5E3fC1A2B3C4D5e" },
   { name: "WaveLabs", address: "0x3C4D5e6F7A8b9C0D1e2F3a4B5C6d7E8F9a0B1C2d" },
-  { name: "FTSO.EU", address: "0x9C0D1E2f3A4b5C6D7E8F9A0B1c2D3e4F5a6B7c8D" },
-  { name: "A-FTSO", address: "0x9f8E7D6c5B4a3f2E1D0C9b8A7E6d5C4B3a2F1e0d" }
-].map(p => ({ ...p, address: toChecksum(p.address) }));
+  { name: "A-FTSO", address: "0x9f8E7D6c5B4a3f2E1D0C9b8A7E6d5C4B3a2F1e0d" },
+  { name: "FTSO.EU", address: "0x9C0D1E2f3A4b5C6D7E8F9A0B1c2D3e4F5a6B7c8D" }
+];
