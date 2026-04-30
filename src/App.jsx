@@ -13,12 +13,64 @@ export default function FlarePortal() {
   const [status, setStatus] = useState("Sẵn sàng");
   const [providerSearch, setProviderSearch] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
+  
+  // State mới cho đồng hồ đếm ngược
+  const [countdown, setCountdown] = useState("");
 
   // Khởi tạo Provider kết nối với MetaMask
   const getProvider = useCallback(() => {
     if (!window.ethereum) return null;
     return new ethers.BrowserProvider(window.ethereum);
   }, []);
+
+  // Logic đếm ngược Epoch
+  const initCountdown = useCallback(async () => {
+    try {
+      const p = getProvider();
+      if (!p) return;
+      
+      const ftso = new ethers.Contract(FLARE_CONFIG.FTSO_MANAGER, ABIS.FTSO_MANAGER, p);
+      
+      // Lấy cấu hình từ Smart Contract
+      const [startTs, duration] = await ftso.getRewardEpochConfiguration();
+      const currentEpoch = await ftso.getCurrentRewardEpoch();
+      
+      // Thời điểm kết thúc Epoch hiện tại = Start + (Current + 1) * Duration
+      const endTs = Number(startTs) + (Number(currentEpoch) + 1) * Number(duration);
+      
+      const updateTick = () => {
+        const now = Math.floor(Date.now() / 1000);
+        const diff = endTs - now;
+        
+        if (diff <= 0) {
+          setCountdown("Đang chuyển Epoch...");
+          return;
+        }
+        
+        const d = Math.floor(diff / 86400);
+        const h = Math.floor((diff % 86400) / 3600);
+        const m = Math.floor((diff % 3600) / 60);
+        const s = diff % 60;
+        
+        setCountdown(`${d}d ${h}h ${m}m ${s}s`);
+      };
+
+      updateTick();
+      const interval = setInterval(updateTick, 1000);
+      return interval;
+    } catch (e) {
+      console.error("Lỗi khởi tạo đếm ngược:", e);
+    }
+  }, [getProvider]);
+
+  // Khởi chạy đếm ngược khi có tài khoản
+  useEffect(() => {
+    let timer;
+    if (account) {
+      initCountdown().then(t => timer = t);
+    }
+    return () => clearInterval(timer);
+  }, [account, initCountdown]);
 
   // Hàm cập nhật toàn bộ dữ liệu số dư và ủy quyền
   const refreshData = useCallback(async (addr, pda) => {
@@ -28,7 +80,6 @@ export default function FlarePortal() {
       const wnat = new ethers.Contract(FLARE_CONFIG.WNAT, ABIS.WNAT, p);
       const rew = new ethers.Contract(FLARE_CONFIG.REWARD_MANAGER, ABIS.REWARD_MANAGER, p);
 
-      // Lấy số dư FLR, WFLR và phần thưởng song song để tối ưu tốc độ
       const [f, w, pw, rewardStates] = await Promise.all([
         p.getBalance(addr),
         wnat.balanceOf(addr),
@@ -38,7 +89,6 @@ export default function FlarePortal() {
 
       const del = await wnat.delegatesOf(pda).catch(() => [[], [], 0n, 0n]);
       
-      // Tính toán tổng phần thưởng từ các Epoch
       let totalRewardWei = 0n;
       if (Array.isArray(rewardStates)) {
         rewardStates.forEach(epochArray => {
@@ -57,7 +107,6 @@ export default function FlarePortal() {
         reward: ethers.formatEther(totalRewardWei)
       });
 
-      // Xử lý danh sách các đơn vị FTSO đang được ủy quyền
       const [dA, bA, , count] = del;
       const currentDels = [];
       for (let i = 0; i < Number(count); i++) {
@@ -76,7 +125,6 @@ export default function FlarePortal() {
     }
   }, [getProvider]);
 
-  // Cơ chế tự động làm mới dữ liệu mỗi 30 giây
   useEffect(() => {
     if (account && pdaAddress) {
       const interval = setInterval(() => refreshData(account, pdaAddress), 30000);
@@ -84,7 +132,6 @@ export default function FlarePortal() {
     }
   }, [account, pdaAddress, refreshData]);
 
-  // Hàm thực thi giao dịch chung
   const execute = async (label, action) => {
     try {
       setStatus(`⏳ ${label}...`);
@@ -106,7 +153,8 @@ export default function FlarePortal() {
     if (!window.ethereum) return alert("Vui lòng cài đặt MetaMask!");
     try {
       const accs = await window.ethereum.request({ method: "eth_requestAccounts" });
-      const csm = new ethers.Contract(FLARE_CONFIG.CLAIM_SETUP_MANAGER, ABIS.CLAIM_SETUP_MANAGER, await getProvider().getSigner());
+      const signer = await (await getProvider()).getSigner();
+      const csm = new ethers.Contract(FLARE_CONFIG.CLAIM_SETUP_MANAGER, ABIS.CLAIM_SETUP_MANAGER, signer);
       const pda = await csm.accountToDelegationAccount(accs[0]);
       setAccount(accs[0]);
       setPdaAddress(pda);
@@ -157,7 +205,8 @@ export default function FlarePortal() {
     card: { background: COLORS.SURFACE, padding: "16px", borderRadius: "20px", marginBottom: "12px", border: "1px solid #1f1f1f" },
     label: { fontSize: "10px", color: COLORS.TEXT_MUTE, fontWeight: "800", marginBottom: "8px", textTransform: "uppercase" },
     input: { flex: 1, padding: "12px", borderRadius: "12px", background: "#080808", color: "white", border: "1px solid #222", fontSize: "16px", width: "100%" },
-    btn: { padding: "12px", borderRadius: "12px", border: "none", cursor: "pointer", fontWeight: "bold", fontSize: "12px", transition: '0.2s' }
+    btn: { padding: "12px", borderRadius: "12px", border: "none", cursor: "pointer", fontWeight: "bold", fontSize: "12px", transition: '0.2s' },
+    timerBox: { background: 'rgba(255, 255, 255, 0.03)', padding: '10px 15px', borderRadius: '12px', marginBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(255,255,255,0.05)' }
   };
 
   return (
@@ -192,18 +241,27 @@ export default function FlarePortal() {
           <section style={{...styles.card, border: `1px solid ${COLORS.PINK}33`}}>
             <div style={{...styles.label, color: COLORS.PINK}}>TÀI KHOẢN ỦY QUYỀN (PDA)</div>
             <div style={{fontSize:24, fontWeight:'900', marginBottom:15}}>{Number(balances.pdaWflr).toLocaleString()} <small style={{fontSize:10, color: COLORS.TEXT_MUTE}}>WFLR</small></div>
+            
+            {/* ĐỒNG HỒ ĐẾM NGƯỢC */}
+            <div style={styles.timerBox}>
+                <span style={{fontSize: '9px', color: COLORS.TEXT_MUTE, fontWeight: '800'}}>KẾT THÚC EPOCH TRONG</span>
+                <span style={{fontSize: '14px', color: COLORS.AMBER, fontFamily: 'monospace', fontWeight: '900'}}>
+                    {countdown || "LÀM MỚI..."}
+                </span>
+            </div>
+
             <div style={{display:'flex', gap:8, marginBottom:10}}>
                 <input type="number" value={pdaAmount} onChange={(e)=>setPdaAmount(e.target.value)} style={styles.input} placeholder="Số lượng rút..."/>
                 <button onClick={() => setPdaAmount(balances.pdaWflr)} style={{...styles.btn, background: COLORS.AMBER, color:'black', padding: '0 15px'}}>MAX</button>
             </div>
             <button onClick={handleWithdrawPDA} style={{...styles.btn, width:'100%', background:'transparent', color: COLORS.AMBER, border: `1px solid ${COLORS.AMBER}66`, marginBottom:15}}>⤺ RÚT VỀ VÍ CHÍNH</button>
             
-            <div style={{background:'rgba(227, 24, 100, 0.1)', padding:15, borderRadius:15, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+            <div style={{background:'rgba(227, 24, 100, 0.1)', padding:15, borderRadius:15, display:'flex', justifyContent:'space-between', alignItems:'center', border: '1px solid rgba(227, 24, 100, 0.2)'}}>
                 <div>
                     <div style={{fontSize:10, color: COLORS.TEXT_MUTE, fontWeight:'bold'}}>PHẦN THƯỞNG CHỜ NHẬN</div>
                     <div style={{color: COLORS.PINK, fontSize:18, fontWeight:'900'}}>+{Number(balances.reward).toFixed(2)} FLR</div>
                 </div>
-                <button onClick={handleClaim} style={{...styles.btn, background: COLORS.PINK, color:'white', padding: '10px 20px'}}>CLAIM</button>
+                <button onClick={handleClaim} style={{...styles.btn, background: COLORS.PINK, color:'white', padding: '10px 20px', boxShadow: `0 4px 15px ${COLORS.PINK}44`}}>CLAIM</button>
             </div>
           </section>
 
@@ -221,7 +279,6 @@ export default function FlarePortal() {
               </div>
             ))}
             
-            {/* TÌM KIẾM PROVIDER */}
             <div style={{position:'relative', marginTop:15}}>
                 <input 
                   type="text" 
