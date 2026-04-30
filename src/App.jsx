@@ -163,7 +163,7 @@ export default function FlarePortal() {
   return (
     <div style={styles.container}>
       <header style={{textAlign:'center', padding: '20px 0'}}>
-        <h2 style={{color: COLORS.PINK, margin: 0, fontWeight: 900}}>FLARE <span style={{fontWeight:300, color:'#fff'}}>PORTAL</span></h2>
+        <h2 style={{color: COLORS.PINK, margin: 0, fontWeight: 900}}>OZPRO <span style={{fontWeight:300, color:'#fff'}}>FLR PORTAL</span></h2>
       </header>
       
       {!account ? (
