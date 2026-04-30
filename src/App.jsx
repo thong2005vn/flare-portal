@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { ethers } from "ethers";
-// Import các hằng số từ file constants.js cùng thư mục src
+// Đảm bảo file constants.js nằm cùng thư mục src và đã có địa chỉ chuẩn Checksum
 import { FLARE_CONFIG, ABIS, PROVIDERS, COLORS } from "./constants";
 
 export default function FlarePortal() {
@@ -28,7 +28,7 @@ export default function FlarePortal() {
       const wnat = new ethers.Contract(FLARE_CONFIG.WNAT, ABIS.WNAT, p);
       const rew = new ethers.Contract(FLARE_CONFIG.REWARD_MANAGER, ABIS.REWARD_MANAGER, p);
 
-      // Lấy số dư FLR, WFLR và phần thưởng song song để tối ưu tốc độ
+      // Lấy số dư FLR, WFLR và phần thưởng song song
       const [f, w, pw, rewardStates] = await Promise.all([
         p.getBalance(addr),
         wnat.balanceOf(addr),
@@ -42,9 +42,9 @@ export default function FlarePortal() {
       let totalRewardWei = 0n;
       if (Array.isArray(rewardStates)) {
         rewardStates.forEach(epochArray => {
-          if (epochArray) {
-            epochArray.forEach(state => { 
-              totalRewardWei += state.amount ? BigInt(state.amount) : 0n; 
+          if (epochArray && epochArray.rewardAmounts) {
+            epochArray.rewardAmounts.forEach(amount => { 
+              totalRewardWei += BigInt(amount); 
             });
           }
         });
@@ -57,7 +57,7 @@ export default function FlarePortal() {
         reward: ethers.formatEther(totalRewardWei)
       });
 
-      // Xử lý danh sách các đơn vị FTSO đang được ủy quyền
+      // Xử lý danh sách FTSO đang được ủy quyền
       const [dA, bA, , count] = del;
       const currentDels = [];
       for (let i = 0; i < Number(count); i++) {
@@ -76,7 +76,7 @@ export default function FlarePortal() {
     }
   }, [getProvider]);
 
-  // Cơ chế tự động làm mới dữ liệu mỗi 30 giây
+  // Tự động làm mới dữ liệu mỗi 30 giây
   useEffect(() => {
     if (account && pdaAddress) {
       const interval = setInterval(() => refreshData(account, pdaAddress), 30000);
@@ -105,8 +105,10 @@ export default function FlarePortal() {
   const connect = async () => {
     if (!window.ethereum) return alert("Vui lòng cài đặt MetaMask!");
     try {
-      const accs = await window.ethereum.request({ method: "eth_requestAccounts" });
-      const csm = new ethers.Contract(FLARE_CONFIG.CLAIM_SETUP_MANAGER, ABIS.CLAIM_SETUP_MANAGER, await getProvider().getSigner());
+      const p = getProvider();
+      const accs = await p.send("eth_requestAccounts", []);
+      const signer = await p.getSigner();
+      const csm = new ethers.Contract(FLARE_CONFIG.CLAIM_SETUP_MANAGER, ABIS.CLAIM_SETUP_MANAGER, signer);
       const pda = await csm.accountToDelegationAccount(accs[0]);
       setAccount(accs[0]);
       setPdaAddress(pda);
@@ -221,7 +223,6 @@ export default function FlarePortal() {
               </div>
             ))}
             
-            {/* TÌM KIẾM PROVIDER */}
             <div style={{position:'relative', marginTop:15}}>
                 <input 
                   type="text" 
