@@ -196,7 +196,7 @@ export default function FlarePortal() {
         <>
           {/* SECTION 1: PERSONAL WALLET */}
           <section style={styles.card}>
-            <div style={styles.label}>MAIN WALLET</div>
+            <div style={{...styles.label, color: COLORS.PINK}}>MAIN WALLET</div>
             <div style={{display:'flex', justifyContent:'space-between', marginBottom:15, fontSize:18, fontWeight:'900'}}>
                 <span>{Number(balances.flr).toFixed(2)} <small style={{fontSize:10, color:COLORS.PINK}}>FLR</small></span>
                 <span>{Number(balances.wflr).toLocaleString()} <small style={{fontSize:10, color:COLORS.PINK}}>WFLR</small></span>
