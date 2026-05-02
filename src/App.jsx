@@ -195,11 +195,11 @@ export default function FlarePortal() {
       ) : (
         <>
           {/* SECTION 1: PERSONAL WALLET */}
-          <section style={styles.card}>
+          <section style={{...styles.card, border: `1px solid ${COLORS.PINK}44`}}>
             <div style={{...styles.label, color: COLORS.PINK}}>MAIN WALLET</div>
             <div style={{display:'flex', justifyContent:'space-between', marginBottom:15, fontSize:24, fontWeight:'900'}}>
-                <span>{Number(balances.flr).toFixed(2)} <small style={{fontSize:10, color:COLORS.PINK}}>FLR</small></span>
-                <span>{Number(balances.wflr).toLocaleString()} <small style={{fontSize:10, color:COLORS.PINK}}>WFLR</small></span>
+                <span>{Number(balances.flr).toFixed(2)} <small style={{fontSize:18, color:COLORS.PINK}}>FLR</small></span>
+                <span>{Number(balances.wflr).toLocaleString()} <small style={{fontSize:18, color:COLORS.PINK}}>WFLR</small></span>
             </div>
             <div style={{display:'flex', gap:8, marginBottom:12}}>
                 <input type="number" value={walletAmount} onChange={(e)=>setWalletAmount(e.target.value)} style={styles.input} placeholder="0.0"/>
