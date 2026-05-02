@@ -218,10 +218,10 @@ export default function FlarePortal() {
             <div style={{fontSize:24, fontWeight:'900', marginBottom:15}}>{Number(balances.pdaWflr).toLocaleString()} <small style={{color:COLORS.AMBER, fontSize:12}}>WFLR</small></div>
             
             <div style={{display:'flex', gap:8, marginBottom:12}}>
-                <input type="number" value={pdaAmount} onChange={(e)=>setPdaAmount(e.target.value)} style={styles.input} placeholder="Rút về ví chính..."/>
+                <input type="number" value={pdaAmount} onChange={(e)=>setPdaAmount(e.target.value)} style={styles.input} placeholder="Rút <..>WFLR về Ví Chính..."/>
                 <button onClick={()=>setPdaAmount(balances.pdaWflr)} style={{...styles.btn, background: COLORS.AMBER, color:'black'}}>MAX</button>
             </div>
-            <button onClick={handleWithdrawPDA} style={{...styles.btn, width:'100%', background:'transparent', color: COLORS.AMBER, border: `1px solid ${COLORS.AMBER}66`, marginBottom:20}}>⤺ RÚT VỀ VÍ CHÍNH</button>
+            <button onClick={handleWithdrawPDA} style={{...styles.btn, width:'100%', background:'transparent', color: COLORS.AMBER, border: `2px solid ${COLORS.AMBER}66`, marginBottom:20}}>⤺ RÚT VỀ VÍ CHÍNH</button>
             
             <div style={{background:'rgba(0,0,0,0.4)', padding:16, borderRadius:20, display:'flex', justifyContent:'space-between', alignItems:'center', border:'1px solid #222'}}>
                 <div>
@@ -233,7 +233,7 @@ export default function FlarePortal() {
           </section>
 
           {/* SECTION 3: DELEGATIONS */}
-          <section style={styles.card}>
+          <section style={{...styles.card, border: `2px solid ${COLORS.PINK}44`}}>
             <div style={styles.label}>Delegations ({delegations.length}/2)</div>
             {delegations.map((d, i) => (
               <div key={i} style={{display:'flex', justifyContent:'space-between', padding:'12px 0', borderBottom:'1px solid #222'}}>
