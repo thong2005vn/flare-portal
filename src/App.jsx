@@ -18,6 +18,7 @@ export default function FlarePortal() {
     return new ethers.BrowserProvider(window.ethereum);
   }, []);
 
+  // CẬP NHẬT: Logic refreshData lọc chính xác phần thưởng chưa claim
   const refreshData = useCallback(async (addr, pda) => {
     if (!addr || !pda) return;
     try {
@@ -39,7 +40,10 @@ export default function FlarePortal() {
         rewardStates.forEach(epochArray => {
           if (epochArray) {
             epochArray.forEach(state => { 
-              totalRewardWei += state.amount ? BigInt(state.amount) : 0n; 
+              // CHỈ cộng dồn nếu 'claimed' là false (Chưa nhận)
+              if (state.amount && state.claimed === false) {
+                totalRewardWei += BigInt(state.amount); 
+              }
             });
           }
         });
@@ -129,22 +133,20 @@ export default function FlarePortal() {
     return csm.withdraw(ethers.parseEther(pdaAmount || "0"));
   });
 
-  // PHẦN ĐÃ SỬA: Tự động lấy Proof từ API và Claim về PDA dưới dạng WFLR
   const handleClaim = () => execute("Nhận thưởng", async () => {
     const s = await (getProvider()).getSigner();
     const r = new ethers.Contract(FLARE_CONFIG.REWARD_MANAGER, ABIS.REWARD_MANAGER, s);
     
-    setStatus("⏳ Đang lấy Proof từ Flare Explorer...");
+    setStatus("⏳ Đang lấy Proof từ API...");
     const apiUrl = `https://flare-explorer.flare.network/api?module=reward&action=get_unclaimed_rewards&address=${pdaAddress}`;
     
     const response = await fetch(apiUrl);
     const json = await response.json();
 
     if (json.status !== "1" || !json.result || json.result.length === 0) {
-      throw new Error("Không có phần thưởng khả dụng để claim.");
+      throw new Error("API chưa cập nhật Proof. Vui lòng thử lại sau vài phút.");
     }
 
-    // Gom nhóm Proof theo Epoch
     const claimsByEpoch = json.result.reduce((acc, item) => {
       const eid = item.rewardEpochId;
       if (!acc[eid]) acc[eid] = [];
@@ -164,8 +166,6 @@ export default function FlarePortal() {
     const proofs = claimsByEpoch[targetEpoch];
 
     setStatus(`⏳ Đang gửi giao dịch Claim Epoch ${targetEpoch}...`);
-
-    // Gửi lệnh claim: Chủ PDA claim cho chính mình, chọn Wrap = true để nhận WFLR
     return r.claim(pdaAddress, pdaAddress, targetEpoch, true, proofs, { gasLimit: 800000 });
   });
 
@@ -228,10 +228,24 @@ export default function FlarePortal() {
                     <div style={{fontSize:10, color: COLORS.TEXT_MUTE, fontWeight:'bold'}}>PHẦN THƯỞNG CHỜ NHẬN</div>
                     <div style={{color: COLORS.PINK, fontSize:18, fontWeight:'900'}}>+{Number(balances.reward).toFixed(2)} FLR</div>
                 </div>
-                <button onClick={handleClaim} style={{...styles.btn, background: COLORS.PINK, color:'white', padding: '10px 20px'}}>CLAIM</button>
+                <button 
+                  onClick={handleClaim} 
+                  disabled={Number(balances.reward) <= 0}
+                  style={{
+                    ...styles.btn, 
+                    background: Number(balances.reward) > 0 ? COLORS.PINK : "#333", 
+                    color:'white', 
+                    padding: '10px 20px',
+                    opacity: Number(balances.reward) > 0 ? 1 : 0.5,
+                    cursor: Number(balances.reward) > 0 ? 'pointer' : 'not-allowed'
+                  }}
+                >
+                  CLAIM
+                </button>
             </div>
           </section>
 
+          {/* Phần ủy quyền giữ nguyên */}
           <section style={styles.card}>
             <div style={styles.label}>ĐANG ỦY QUYỀN ({delegations.length}/2)</div>
             {delegations.length === 0 && <div style={{fontSize: 12, color: COLORS.TEXT_MUTE, textAlign: 'center', padding: '10px 0'}}>Chưa có ủy quyền nào</div>}
