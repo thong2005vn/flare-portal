@@ -1,6 +1,25 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { ethers } from "ethers";
-import { FLARE_CONFIG, ABIS, PROVIDERS, COLORS } from "./constants";
+
+// --- CẤU HÌNH HỆ THỐNG FLARE ---
+const WNAT = "0x1D80c49BbBCd1C0911346656B529DF9E5c2F783d";
+const REWARD_MANAGER = "0xC8f55c5aA2C752eE285Bd872855C749f4ee6239B";
+const CLAIM_SETUP_MANAGER = "0xD56c0Ea37B848939B59e6F5Cda119b3fA473b5eB";
+
+const COLORS = {
+  PINK: "#e31864",
+  AMBER: "#fbbf24",
+  DARK: "#000000",
+  SURFACE: "#111111",
+  BORDER: "#262626",
+  TEXT_MUTE: "#94a3b8"
+};
+
+const PROVIDERS = [
+  { name: "Zellic", address: "0x76E5591dDa384A30eEb53fD4059C9570eE072E7e" },
+  { name: "African Proofs", address: "0x7b3F2a1C8E9d4F2A1B3C4D5E6F7A8B9C0D1E2F3A" },
+  { name: "Enosys", address: "0x8C6f28f2F1A2C1eB8C9F9bA2A5e3fC1A2B3C4D5E" }
+];
 
 export default function FlarePortal() {
   const [account, setAccount] = useState("");
@@ -18,13 +37,18 @@ export default function FlarePortal() {
     return new ethers.BrowserProvider(window.ethereum);
   }, []);
 
-  // REFRESH DATA: Đã sửa logic lọc phần thưởng để tránh bị ẩn tiền
   const refreshData = useCallback(async (addr, pda) => {
     if (!addr || !pda) return;
     try {
       const p = getProvider();
-      const wnat = new ethers.Contract(FLARE_CONFIG.WNAT, ABIS.WNAT, p);
-      const rew = new ethers.Contract(FLARE_CONFIG.REWARD_MANAGER, ABIS.REWARD_MANAGER, p);
+      const wnat = new ethers.Contract(WNAT, [
+        "function balanceOf(address) view returns (uint256)", 
+        "function delegatesOf(address) view returns (address[], uint256[], uint256, uint256)"
+      ], p);
+      
+      const rew = new ethers.Contract(REWARD_MANAGER, [
+        "function getStateOfRewards(address) view returns (tuple(uint24 rewardEpochId, bytes20 beneficiary, uint120 amount, uint8 claimType, bool initialised, bool claimed)[][])"
+      ], p);
 
       const [f, w, pw, rewardStates] = await Promise.all([
         p.getBalance(addr),
@@ -33,16 +57,14 @@ export default function FlarePortal() {
         rew.getStateOfRewards(pda).catch(() => [])
       ]);
 
-      const del = await wnat.delegatesOf(pda).catch(() => [[], [], 0n, 0n]);
-      
+      // Logic tính toán phần thưởng chuẩn
       let totalRewardWei = 0n;
       if (Array.isArray(rewardStates)) {
         rewardStates.forEach(epochArray => {
           if (Array.isArray(epochArray)) {
             epochArray.forEach(state => { 
               const amt = state.amount ? BigInt(state.amount) : 0n;
-              // LOGIC MỚI: Chỉ bỏ qua nếu đã claim (true). 
-              // Nếu là false hoặc undefined/null thì vẫn cộng dồn để hiển thị.
+              // CHỈ CỘNG NẾU CHƯA ĐƯỢC CLAIM (claimed !== true)
               if (amt > 0n && state.claimed !== true) {
                 totalRewardWei += amt; 
               }
@@ -58,27 +80,23 @@ export default function FlarePortal() {
         reward: ethers.formatEther(totalRewardWei)
       });
 
+      // Lấy danh sách Delegations
+      const del = await wnat.delegatesOf(pda).catch(() => [[], [], 0n, 0n]);
       const [dA, bA, , count] = del;
       const currentDels = [];
       for (let i = 0; i < Number(count); i++) {
         if (dA[i] && dA[i] !== ethers.ZeroAddress) {
           const pInfo = PROVIDERS.find(prov => prov.address.toLowerCase() === dA[i].toLowerCase());
-          currentDels.push({ 
-            name: pInfo ? pInfo.name : "Unknown", 
-            addr: dA[i], 
-            pct: Number(bA[i]) / 100 
-          });
+          currentDels.push({ name: pInfo ? pInfo.name : "Unknown", addr: dA[i], pct: Number(bA[i]) / 100 });
         }
       }
       setDelegations(currentDels);
-    } catch (e) {
-      console.error("Lỗi cập nhật dữ liệu:", e);
-    }
+    } catch (e) { console.error("Refresh Error:", e); }
   }, [getProvider]);
 
+  // Tự động refresh mỗi 30s
   useEffect(() => {
     if (account && pdaAddress) {
-      refreshData(account, pdaAddress);
       const interval = setInterval(() => refreshData(account, pdaAddress), 30000);
       return () => clearInterval(interval);
     }
@@ -90,91 +108,60 @@ export default function FlarePortal() {
       const tx = await action();
       if (tx) {
         await tx.wait();
-        setStatus(`✅ ${label} thành công!`);
+        setStatus(`✅ ${label} xong!`);
         setWalletAmount("");
         setPdaAmount("");
         setTimeout(() => refreshData(account, pdaAddress), 2000);
       }
     } catch (e) {
       console.error(e);
-      setStatus(`❌ Lỗi: ${e.reason || e.message || "Giao dịch thất bại"}`);
+      setStatus(`❌ Lỗi: ${e.reason || "Giao dịch thất bại"}`);
     }
   };
 
   const connect = async () => {
-    if (!window.ethereum) return alert("Vui lòng cài đặt MetaMask!");
-    try {
-      const accs = await window.ethereum.request({ method: "eth_requestAccounts" });
-      const p = getProvider();
-      const signer = await p.getSigner();
-      const csm = new ethers.Contract(FLARE_CONFIG.CLAIM_SETUP_MANAGER, ABIS.CLAIM_SETUP_MANAGER, signer);
-      const pda = await csm.accountToDelegationAccount(accs[0]);
-      setAccount(accs[0]);
-      setPdaAddress(pda);
-      refreshData(accs[0], pda);
-    } catch (e) {
-      setStatus("❌ Kết nối ví thất bại");
-    }
+    if (!window.ethereum) return alert("Cài MetaMask!");
+    const accs = await window.ethereum.request({ method: "eth_requestAccounts" });
+    const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, ["function accountToDelegationAccount(address) view returns (address)"], getProvider());
+    const pda = await csm.accountToDelegationAccount(accs[0]);
+    setAccount(accs[0]);
+    setPdaAddress(pda);
+    refreshData(accs[0], pda);
   };
+
+  const handleWithdrawPDA = () => execute("Rút tiền PDA", async () => {
+    const s = await (getProvider()).getSigner();
+    const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, ["function withdraw(uint256) external"], s);
+    return csm.withdraw(ethers.parseEther(pdaAmount || "0"));
+  });
+
+  const handleClaim = () => execute("Nhận thưởng", async () => {
+    const s = await (getProvider()).getSigner();
+    const r = new ethers.Contract(REWARD_MANAGER, [
+      "function claim(address, address, uint24, bool, tuple[]) returns (uint256)",
+      "function getRewardEpochIdsWithClaimableRewards() view returns (uint24, uint24)"
+    ], s);
+    const [, end] = await r.getRewardEpochIdsWithClaimableRewards();
+    // Gửi mảng trống [] để claim tất cả các đợt sẵn có theo mặc định của Contract
+    return r.claim(pdaAddress, pdaAddress, end, true, []);
+  });
 
   const handleWrap = (isWrap) => execute(isWrap ? "Wrap" : "Unwrap", async () => {
     const s = await (getProvider()).getSigner();
-    const w = new ethers.Contract(FLARE_CONFIG.WNAT, ABIS.WNAT, s);
+    const w = new ethers.Contract(WNAT, ["function deposit() payable", "function withdraw(uint256)"], s);
     const val = ethers.parseEther(walletAmount || "0");
     return isWrap ? w.deposit({ value: val }) : w.withdraw(val);
   });
 
   const handleToPDA = () => execute("Nạp vào PDA", async () => {
     const s = await (getProvider()).getSigner();
-    const w = new ethers.Contract(FLARE_CONFIG.WNAT, ABIS.WNAT, s);
+    const w = new ethers.Contract(WNAT, ["function transfer(address,uint256)"], s);
     return w.transfer(pdaAddress, ethers.parseEther(walletAmount || "0"));
   });
 
-  const handleWithdrawPDA = () => execute("Rút từ PDA", async () => {
+  const handleDelegate = (target, pct = 50) => execute(pct === 0 ? "Gỡ bỏ" : "Ủy quyền", async () => {
     const s = await (getProvider()).getSigner();
-    const csm = new ethers.Contract(FLARE_CONFIG.CLAIM_SETUP_MANAGER, ABIS.CLAIM_SETUP_MANAGER, s);
-    return csm.withdraw(ethers.parseEther(pdaAmount || "0"));
-  });
-
-  const handleClaim = () => execute("Nhận thưởng", async () => {
-    const s = await (getProvider()).getSigner();
-    const r = new ethers.Contract(FLARE_CONFIG.REWARD_MANAGER, ABIS.REWARD_MANAGER, s);
-    
-    setStatus("⏳ Đang lấy Proof từ API...");
-    const apiUrl = `https://flare-explorer.flare.network/api?module=reward&action=get_unclaimed_rewards&address=${pdaAddress}`;
-    
-    const response = await fetch(apiUrl);
-    const json = await response.json();
-
-    if (json.status !== "1" || !json.result || json.result.length === 0) {
-      throw new Error("Không tìm thấy Proof. Có thể phần thưởng đã được nhận hoặc chưa tới đợt.");
-    }
-
-    const claimsByEpoch = json.result.reduce((acc, item) => {
-      const eid = item.rewardEpochId;
-      if (!acc[eid]) acc[eid] = [];
-      acc[eid].push({
-        merkleProof: item.merkleProof,
-        body: {
-          rewardEpochId: eid,
-          beneficiary: item.beneficiary,
-          amount: item.amount,
-          claimType: item.claimType
-        }
-      });
-      return acc;
-    }, {});
-
-    const targetEpoch = Object.keys(claimsByEpoch)[0];
-    const proofs = claimsByEpoch[targetEpoch];
-
-    setStatus(`⏳ Đang gửi giao dịch Claim Epoch ${targetEpoch}...`);
-    return r.claim(pdaAddress, pdaAddress, targetEpoch, true, proofs, { gasLimit: 800000 });
-  });
-
-  const handleDelegate = (target, pct = 50) => execute(pct === 0 ? "Hủy ủy quyền" : "Ủy quyền", async () => {
-    const s = await (getProvider()).getSigner();
-    const w = new ethers.Contract(FLARE_CONFIG.WNAT, ABIS.WNAT, s);
+    const w = new ethers.Contract(WNAT, ["function delegate(address,uint256)"], s);
     return w.delegate(target, pct * 100);
   });
 
@@ -183,32 +170,31 @@ export default function FlarePortal() {
   [providerSearch]);
 
   const styles = {
-    container: { boxSizing: 'border-box', padding: "12px", width: "100%", maxWidth: "450px", margin: "0 auto", background: COLORS.DARK, color: "white", minHeight: "100vh", fontFamily: "-apple-system, sans-serif" },
-    card: { background: COLORS.SURFACE, padding: "16px", borderRadius: "20px", marginBottom: "12px", border: "1px solid #1f1f1f" },
-    label: { fontSize: "10px", color: COLORS.TEXT_MUTE, fontWeight: "800", marginBottom: "8px", textTransform: "uppercase" },
-    input: { flex: 1, padding: "12px", borderRadius: "12px", background: "#080808", color: "white", border: "1px solid #222", fontSize: "16px", width: "100%" },
-    btn: { padding: "12px", borderRadius: "12px", border: "none", cursor: "pointer", fontWeight: "bold", fontSize: "12px", transition: '0.2s' }
+    container: { boxSizing: 'border-box', padding: "24px", maxWidth: "420px", margin: "20px auto", background: COLORS.DARK, color: "white", borderRadius: "32px", border: `1px solid ${COLORS.BORDER}`, fontFamily: "-apple-system, sans-serif" },
+    card: { boxSizing: 'border-box', background: COLORS.SURFACE, padding: "20px", borderRadius: "24px", marginBottom: "16px", border: "1px solid #1f1f1f" },
+    label: { fontSize: "11px", color: COLORS.TEXT_MUTE, fontWeight: "800", marginBottom: "12px", textTransform: "uppercase" },
+    input: { flex: 1, padding: "12px", borderRadius: "14px", background: "#080808", color: "white", border: "1px solid #222", outline: "none", width:'100%' },
+    btn: { padding: "12px", borderRadius: "14px", border: "none", cursor: "pointer", fontWeight: "bold", fontSize: "12px" }
   };
 
   return (
     <div style={styles.container}>
-      <header style={{textAlign:'center', padding: '20px 0'}}>
-        <h2 style={{color: COLORS.PINK, margin: 0, fontWeight: 900}}>OZPRO <span style={{fontWeight:300, color:'#fff'}}>FLR PORTAL</span></h2>
+      <header style={{textAlign:'center', marginBottom:'25px'}}>
+        <h2 style={{color: COLORS.PINK, letterSpacing: '2px', margin: 0}}>FLR <span style={{fontWeight:300, color:'#fff'}}>PORTAL</span></h2>
       </header>
       
       {!account ? (
-        <button onClick={connect} style={{...styles.btn, width:'100%', background: COLORS.PINK, color:'white', fontSize: '14px', height: '55px'}}>KẾT NỐI VÍ METAMASK</button>
+        <button onClick={connect} style={{...styles.btn, width:'100%', background: COLORS.PINK, color:'white', padding:'18px'}}>KẾT NỐI VÍ METAMASK</button>
       ) : (
         <>
           <section style={styles.card}>
-            <div style={styles.label}>VÍ CHÍNH (WALLET)</div>
+            <div style={styles.label}>VÍ CHÍNH</div>
             <div style={{display:'flex', justifyContent:'space-between', marginBottom:15, fontSize:18, fontWeight:'bold'}}>
-                <span>{Number(balances.flr).toFixed(2)} <small style={{fontSize:10, color:COLORS.TEXT_MUTE}}>FLR</small></span>
-                <span>{Number(balances.wflr).toLocaleString()} <small style={{fontSize:10, color:COLORS.TEXT_MUTE}}>WFLR</small></span>
+                <span>{Number(balances.flr).toFixed(2)} FLR</span>
+                <span>{Number(balances.wflr).toFixed(2)} WFLR</span>
             </div>
-            <div style={{display:'flex', gap:8, marginBottom:10}}>
-                <input type="number" value={walletAmount} onChange={(e)=>setWalletAmount(e.target.value)} style={styles.input} placeholder="Nhập số lượng..."/>
-                <button onClick={() => setWalletAmount(balances.flr)} style={{...styles.btn, background: COLORS.PINK, color:'white', padding: '0 15px'}}>MAX</button>
+            <div style={{display:'flex', gap:8, marginBottom:12}}>
+                <input type="number" value={walletAmount} onChange={(e)=>setWalletAmount(e.target.value)} style={styles.input} placeholder="0.0"/>
             </div>
             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8}}>
                 <button onClick={()=>handleWrap(true)} style={{...styles.btn, background:'#222', color:'white'}}>WRAP</button>
@@ -217,75 +203,47 @@ export default function FlarePortal() {
             </div>
           </section>
 
-          <section style={{...styles.card, border: `1px solid ${COLORS.PINK}33`}}>
-            <div style={{...styles.label, color: COLORS.PINK}}>TÀI KHOẢN ỦY QUYỀN (PDA)</div>
-            <div style={{fontSize:24, fontWeight:'900', marginBottom:15}}>{Number(balances.pdaWflr).toLocaleString()} <small style={{fontSize:10, color: COLORS.TEXT_MUTE}}>WFLR</small></div>
-            <div style={{display:'flex', gap:8, marginBottom:10}}>
-                <input type="number" value={pdaAmount} onChange={(e)=>setPdaAmount(e.target.value)} style={styles.input} placeholder="Số lượng rút..."/>
-                <button onClick={() => setPdaAmount(balances.pdaWflr)} style={{...styles.btn, background: COLORS.AMBER, color:'black', padding: '0 15px'}}>MAX</button>
-            </div>
-            <button onClick={handleWithdrawPDA} style={{...styles.btn, width:'100%', background:'transparent', color: COLORS.AMBER, border: `1px solid ${COLORS.AMBER}66`, marginBottom:15}}>⤺ RÚT VỀ VÍ CHÍNH</button>
+          <section style={{...styles.card, border: `1px solid ${COLORS.PINK}44`}}>
+            <div style={{...styles.label, color: COLORS.PINK}}>TÀI KHOẢN PDA (ỦY QUYỀN)</div>
+            <div style={{fontSize:26, fontWeight:'900', marginBottom:15}}>{Number(balances.pdaWflr).toLocaleString()} <small style={{fontSize:12}}>WFLR</small></div>
             
-            <div style={{background:'rgba(227, 24, 100, 0.1)', padding:15, borderRadius:15, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+            <div style={{display:'flex', gap:8, marginBottom:12}}>
+                <input type="number" value={pdaAmount} onChange={(e)=>setPdaAmount(e.target.value)} style={styles.input} placeholder="Rút về ví chính..."/>
+                <button onClick={()=>setPdaAmount(balances.pdaWflr)} style={{...styles.btn, background: COLORS.AMBER, color:'black'}}>MAX</button>
+            </div>
+            <button onClick={handleWithdrawPDA} style={{...styles.btn, width:'100%', background:'transparent', color: COLORS.AMBER, border: `1px solid ${COLORS.AMBER}66`, marginBottom:20}}>RÚT VỀ VÍ CHÍNH</button>
+            
+            <div style={{background:'rgba(227, 24, 100, 0.1)', padding:16, borderRadius:20, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                 <div>
-                    <div style={{fontSize:10, color: COLORS.TEXT_MUTE, fontWeight:'bold'}}>PHẦN THƯỞNG CHỜ NHẬN</div>
-                    <div style={{color: COLORS.PINK, fontSize:18, fontWeight:'900'}}>+{Number(balances.reward).toFixed(2)} FLR</div>
+                    <div style={{fontSize:10, color: COLORS.TEXT_MUTE}}>REWARDS ĐANG CÓ</div>
+                    <div style={{color: COLORS.PINK, fontSize:20, fontWeight:'900'}}>+{Number(balances.reward).toFixed(2)} FLR</div>
                 </div>
-                <button 
-                  onClick={handleClaim} 
-                  disabled={Number(balances.reward) <= 0}
-                  style={{
-                    ...styles.btn, 
-                    background: Number(balances.reward) > 0 ? COLORS.PINK : "#333", 
-                    color:'white', 
-                    padding: '10px 20px',
-                    opacity: Number(balances.reward) > 0 ? 1 : 0.5,
-                    cursor: Number(balances.reward) > 0 ? 'pointer' : 'not-allowed'
-                  }}
-                >
-                  CLAIM
-                </button>
+                <button onClick={handleClaim} disabled={Number(balances.reward) <= 0} style={{...styles.btn, background: Number(balances.reward) > 0 ? COLORS.PINK : '#333', color:'white', padding:'12px 20px'}}>CLAIM</button>
             </div>
           </section>
 
           <section style={styles.card}>
-            <div style={styles.label}>ĐANG ỦY QUYỀN ({delegations.length}/2)</div>
-            {delegations.length === 0 && <div style={{fontSize: 12, color: COLORS.TEXT_MUTE, textAlign: 'center', padding: '10px 0'}}>Chưa có ủy quyền nào</div>}
+            <div style={styles.label}>DANH SÁCH ỦY QUYỀN ({delegations.length}/2)</div>
             {delegations.map((d, i) => (
-              <div key={i} style={{display:'flex', justifyContent:'space-between', padding:'12px 0', borderBottom: i === delegations.length - 1 ? 'none' : '1px solid #222'}}>
-                <div>
-                  <div style={{fontWeight:'bold', fontSize:14}}>{d.name}</div>
-                  <div style={{fontSize:11, color: COLORS.PINK, fontWeight:'bold'}}>{d.pct}% Power</div>
-                </div>
-                <button onClick={()=>handleDelegate(d.addr, 0)} style={{background:'#ff444422', border:'none', color:'#ff4444', borderRadius:10, padding:'5px 12px', fontWeight:'bold'}}>✕ GỠ</button>
+              <div key={i} style={{display:'flex', justifyContent:'space-between', padding:'10px 0', borderBottom:'1px solid #222'}}>
+                <div><div style={{fontWeight:'bold'}}>{d.name}</div><div style={{fontSize:11, color: COLORS.PINK}}>{d.pct}%</div></div>
+                <button onClick={()=>handleDelegate(d.addr, 0)} style={{background:'transparent', border:'none', color:'#ff4444', fontWeight:'bold'}}>✕</button>
               </div>
             ))}
-            
-            <div style={{position:'relative', marginTop:15}}>
-                <input 
-                  type="text" 
-                  placeholder="Tìm & Thêm FTSO Provider..." 
-                  value={providerSearch} 
-                  onFocus={()=>setShowDropdown(true)} 
-                  onChange={(e)=>setProviderSearch(e.target.value)} 
-                  style={styles.input}
-                />
-                {showDropdown && (
-                    <div style={{position:'absolute', bottom:'110%', left:0, right:0, background:'#181818', borderRadius:15, border:'1px solid #333', maxHeight:160, overflowY:'auto', zIndex:100, boxShadow: '0 -10px 20px rgba(0,0,0,0.5)'}}>
-                        {filteredProviders.map(p => (
-                            <div key={p.address} onClick={()=>{handleDelegate(p.address, 50); setShowDropdown(false);}} style={{padding:12, borderBottom:'1px solid #222', fontSize:13, display:'flex', justifyContent:'space-between', cursor:'pointer'}}>
-                                <span>{p.name}</span>
-                                <span style={{color:COLORS.PINK, fontWeight:'bold'}}>+ 50%</span>
-                            </div>
-                        ))}
-                    </div>
-                )}
-                {showDropdown && <div onClick={()=>setShowDropdown(false)} style={{position:'fixed', top:0, left:0, right:0, bottom:0, zIndex:90}}></div>}
-            </div>
+            <input type="text" placeholder="Thêm Provider..." value={providerSearch} onFocus={()=>setShowDropdown(true)} onChange={(e)=>setProviderSearch(e.target.value)} style={{...styles.input, marginTop:10}}/>
+            {showDropdown && (
+              <div style={{background:'#181818', borderRadius:14, marginTop:5, maxHeight:120, overflowY:'auto'}}>
+                {filteredProviders.map(p => (
+                  <div key={p.address} onClick={()=>{handleDelegate(p.address, 50); setShowDropdown(false);}} style={{padding:10, borderBottom:'1px solid #222', cursor:'pointer', fontSize:12}}>
+                    {p.name} <span style={{float:'right', color:COLORS.PINK}}>+50%</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
-          <footer style={{textAlign:'center', paddingBottom: 20}}>
-            <span style={{fontSize: 10, color: COLORS.PINK, fontWeight: 'bold', letterSpacing: 1.5}}>{status.toUpperCase()}</span>
+          <footer style={{textAlign:'center', fontSize:10, color: COLORS.PINK, fontWeight:'bold', marginTop:10}}>
+             STATUS: {status.toUpperCase()}
           </footer>
         </>
       )}
