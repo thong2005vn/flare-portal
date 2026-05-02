@@ -221,7 +221,7 @@ export default function FlarePortal() {
                 <input type="number" value={pdaAmount} onChange={(e)=>setPdaAmount(e.target.value)} style={styles.input} placeholder="Điền số lượng WFLR cần rút..."/>
                 <button onClick={()=>setPdaAmount(balances.pdaWflr)} style={{...styles.btn, background: COLORS.AMBER, color:'black'}}>MAX</button>
             </div>
-            <button onClick={handleWithdrawPDA} style={{...styles.btn, width:'100%', background:'transparent', color: COLORS.AMBER, border: `2px solid ${COLORS.AMBER}66`, marginBottom:20}}>⤺ RÚT WFLR VỀ MAIN WALLET</button>
+            <button onClick={handleWithdrawPDA} style={{...styles.btn, width:'100%', background:'transparent', color: COLORS.AMBER, border: `10px solid ${COLORS.AMBER}66`, marginBottom:20}}>⤺ RÚT WFLR VỀ MAIN WALLET</button>
             
             <div style={{background:'rgba(0,0,0,0.4)', padding:16, borderRadius:20, display:'flex', justifyContent:'space-between', alignItems:'center', border:'1px solid #222'}}>
                 <div>
