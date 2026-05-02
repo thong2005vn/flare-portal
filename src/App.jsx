@@ -195,7 +195,7 @@ export default function FlarePortal() {
       ) : (
         <>
           {/* SECTION 1: PERSONAL WALLET */}
-          <section style={{...styles.card, border: `1px solid ${COLORS.PINK}44`}}>
+          <section style={{...styles.card, border: `2px solid ${COLORS.PINK}44`}}>
             <div style={{...styles.label, color: COLORS.PINK}}>MAIN WALLET</div>
             <div style={{display:'flex', justifyContent:'space-between', marginBottom:15, fontSize:24, fontWeight:'900'}}>
                 <span>{Number(balances.flr).toFixed(2)} <small style={{fontSize:18, color:COLORS.PINK}}>FLR</small></span>
@@ -213,7 +213,7 @@ export default function FlarePortal() {
           </section>
 
           {/* SECTION 2: PDA ACCOUNT */}
-          <section style={{...styles.card, border: `1px solid ${COLORS.AMBER}44`}}>
+          <section style={{...styles.card, border: `2px solid ${COLORS.AMBER}44`}}>
             <div style={{...styles.label, color: COLORS.AMBER}}>DELEGATION ACCOUNT (PDA)</div>
             <div style={{fontSize:24, fontWeight:'900', marginBottom:15}}>{Number(balances.pdaWflr).toLocaleString()} <small style={{color:COLORS.AMBER, fontSize:12}}>WFLR</small></div>
             
