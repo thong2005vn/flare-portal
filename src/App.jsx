@@ -208,7 +208,7 @@ export default function FlarePortal() {
             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1.2fr', gap:8}}>
                 <button onClick={()=>handleWrap(true)} style={{...styles.btn, background: COLORS.PINK, color:'white'}}>WRAP</button>
                 <button onClick={()=>handleWrap(false)} style={{...styles.btn, background: COLORS.PINK, color:'white'}}>UNWRAP</button>
-                <button onClick={handleToPDA} style={{...styles.btn, background: COLORS.PINK, color:'amber'}}>NẠP PDA</button>
+                <button onClick={handleToPDA} style={{...styles.btn, background: COLORS.PINK, color:'yellow'}}>NẠP PDA</button>
             </div>
           </section>
 
