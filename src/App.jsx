@@ -206,8 +206,8 @@ export default function FlarePortal() {
                 <button onClick={()=>setWalletAmount(balances.flr)} style={{...styles.btn, background: COLORS.PINK, color:'white'}}>MAX</button>
             </div>
             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1.2fr', gap:8}}>
-                <button onClick={()=>handleWrap(true)} style={{...styles.btn, background:'#222', color:'white'}}>WRAP</button>
-                <button onClick={()=>handleWrap(false)} style={{...styles.btn, background:'#222', color:'white'}}>UNWRAP</button>
+                <button onClick={()=>handleWrap(true)} style={{...styles.btn, background: COLORS.PINK, color:'white'}}>WRAP</button>
+                <button onClick={()=>handleWrap(false)} style={{...styles.btn, background: COLORS.PINK, color:'white'}}>UNWRAP</button>
                 <button onClick={handleToPDA} style={{...styles.btn, background: COLORS.PINK, color:'white'}}>NẠP PDA</button>
             </div>
           </section>
