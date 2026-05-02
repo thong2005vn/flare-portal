@@ -225,10 +225,10 @@ export default function FlarePortal() {
             
             <div style={{background:'rgba(0,0,0,0.4)', padding:16, borderRadius:20, display:'flex', justifyContent:'space-between', alignItems:'center', border:'1px solid #222'}}>
                 <div>
-                    <div style={{fontSize:10, color: COLORS.TEXT_MUTE}}>UNCLAIMED REWARDS</div>
-                    <div style={{color: COLORS.PINK, fontSize:20, fontWeight:'900'}}>+{Number(balances.reward).toFixed(2)} FLR</div>
+                    <div style={{fontSize:10, color: COLORS.AMBER}}>UNCLAIMED REWARDS</div>
+                    <div style={{color: COLORS.AMBER, fontSize:20, fontWeight:'900'}}>+{Number(balances.reward).toFixed(2)} FLR</div>
                 </div>
-                <button onClick={handleClaim} disabled={Number(balances.reward) <= 0} style={{...styles.btn, background: Number(balances.reward) > 0 ? COLORS.PINK : '#222', color:'white', padding:'12px 20px'}}>CLAIM</button>
+                <button onClick={handleClaim} disabled={Number(balances.reward) <= 0} style={{...styles.btn, background: Number(balances.reward) > 0 ? COLORS.AMBER : '#222', color:'white', padding:'12px 20px'}}>CLAIM</button>
             </div>
           </section>
 
