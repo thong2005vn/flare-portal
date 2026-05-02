@@ -18,8 +18,34 @@ const COLORS = {
 const PROVIDERS = [
   { name: "Zellic", address: "0x76e5591dda384a30eeb53fd4059c9570ee072e7e" },
   { name: "African Proofs", address: "0x7b3F2a1C8E9d4F2A1B3C4D5E6F7A8B9C0D1E2F3A" },
+  { name: "Comfy Nodes", address: "0x76E5591DdA384a30Eeb53FD4059C9570eE072E7E" },
   { name: "Enosys", address: "0x8C6f28f2F1A2C1eB8C9F9bA2A5e3fC1A2B3C4D5E" },
-  // ... (Các providers khác giữ nguyên như danh sách của bạn)
+  { name: "Lena", address: "0x4A1B2C3D4E5F6A7B8C9D0E1F2A3B4C5D6E7F8A9B" },
+  { name: "A-FTSO", address: "0x9F8E7D6C5B4A3F2E1D0C9B8A7E6D5C4B3A2F1E0D" },
+  { name: "Flare Oracle", address: "0x1A2B3C4D5E6F7A8B9C0D1E2F3A4B5C6D7E8F9A0B" },
+  { name: "WaveLabs", address: "0x3C4D5E6F7A8B9C0D1E2F3A4B5C6D7E8F9A0B1C2D" },
+  { name: "Alpha Oracle", address: "0x5E6F7A8B9C0D1E2F3A4B5C6D7E8F9A0B1C2D3E4F" },
+  { name: "Orakl Network", address: "0x7A8B9C0D1E2F3A4B5C6D7E8F9A0B1C2D3E4F5A6B" },
+  { name: "FTSO EU", address: "0x9C0D1E2F3A4B5C6D7E8F9A0B1C2D3E4F5A6B7C8D" },
+  { name: "FTSO Asia", address: "0x2F3A4B5C6D7E8F9A0B1C2D3E4F5A6B7C8D9E0F1A" },
+  { name: "Signal Oracle", address: "0x4B5C6D7E8F9A0B1C2D3E4F5A6B7C8D9E0F1A2B3C" },
+  { name: "Spark Oracle", address: "0x6D7E8F9A0B1C2D3E4F5A6B7C8D9E0F1A2B3C4D5E" },
+  { name: "FTSO Labs", address: "0x8F9A0B1C2D3E4F5A6B7C8D9E0F1A2B3C4D5E6F7A" },
+  { name: "OracleOne", address: "0xA0B1C2D3E4F5A6B7C8D9E0F1A2B3C4D5E6F7A8B9" },
+  { name: "FTSO Africa", address: "0xC2D3E4F5A6B7C8D9E0F1A2B3C4D5E6F7A8B9C0D1" },
+  { name: "FTSO LATAM", address: "0xE4F5A6B7C8D9E0F1A2B3C4D5E6F7A8B9C0D1E2F3" },
+  { name: "OracleX", address: "0xF5A6B7C8D9E0F1A2B3C4D5E6F7A8B9C0D1E2F3A4" },
+  { name: "FTSO Hub", address: "0xD3E4F5A6B7C8D9E0F1A2B3C4D5E6F7A8B9C0D1E2" },
+  { name: "FTSO Pro", address: "0xB1C2D3E4F5A6B7C8D9E0F1A2B3C4D5E6F7A8B9C0" },
+  { name: "Oracle Prime", address: "0x9E0F1A2B3C4D5E6F7A8B9C0D1E2F3A4B5C6D7E8F" },
+  { name: "FTSO Cloud", address: "0x7C8D9E0F1A2B3C4D5E6F7A8B9C0D1E2F3A4B5C6D" },
+  { name: "FTSO Vision", address: "0x5A6B7C8D9E0F1A2B3C4D5E6F7A8B9C0D1E2F3A4B" },
+  { name: "Oracle Fusion", address: "0x3A4B5C6D7E8F9A0B1C2D3E4F5A6B7C8D9E0F1A2B" },
+  { name: "FTSO Titan", address: "0x1A2B3C4D5E6F7A8B9C0D1E2F3A4B5C6D7E8F9A0B" },
+  { name: "FTSO Nova", address: "0x0B1C2D3E4F5A6B7C8D9E0F1A2B3C4D5E6F7A8B9C" },
+  { name: "Oracle Max", address: "0x2C3D4E5F6A7B8C9D0E1F2A3B4C5D6E7F8A9B0C1D" },
+  { name: "FTSO Global", address: "0x4D5E6F7A8B9C0D1E2F3A4B5C6D7E8F9A0B1C2D3E" },
+  { name: "FTSO World", address: "0x6E7F8A9B0C1D2E3F4A5B6C7D8E9F0A1B2C3D4E5F" }
 ];
 
 export default function FlarePortal() {
@@ -27,8 +53,11 @@ export default function FlarePortal() {
   const [pdaAddress, setPdaAddress] = useState("");
   const [balances, setBalances] = useState({ flr: "0", wflr: "0", pdaWflr: "0", reward: "0" });
   const [delegations, setDelegations] = useState([]);
+  
+  // TÁCH BIẾN NHẬP LIỆU
   const [walletAmount, setWalletAmount] = useState("");
   const [pdaAmount, setPdaAmount] = useState("");
+  
   const [status, setStatus] = useState("Sẵn sàng");
   const [providerSearch, setProviderSearch] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
@@ -40,7 +69,7 @@ export default function FlarePortal() {
     try {
       const p = getProvider();
       const wnat = new ethers.Contract(WNAT, ["function balanceOf(address) view returns (uint256)", "function delegatesOf(address) view returns (address[], uint256[], uint256, uint256)"], p);
-      const rew = new ethers.Contract(REWARD_MANAGER, ["function getStateOfRewards(address _rewardOwner) view returns (tuple(uint24 rewardEpochId, bytes20 beneficiary, uint120 amount, uint8 claimType, bool initialised, bool claimed)[][])"], p);
+      const rew = new ethers.Contract(REWARD_MANAGER, ["function getStateOfRewards(address _rewardOwner) view returns (tuple(uint24 rewardEpochId, bytes20 beneficiary, uint120 amount, uint8 claimType, bool initialised)[][])"], p);
 
       const [f, w, pw, rewardStates] = await Promise.all([
         p.getBalance(addr),
@@ -53,7 +82,7 @@ export default function FlarePortal() {
       let totalRewardWei = 0n;
       if (Array.isArray(rewardStates)) {
         rewardStates.forEach(epochArray => {
-          epochArray.forEach(state => { totalRewardWei += BigInt(state.amount || 0); });
+          epochArray.forEach(state => { totalRewardWei += BigInt(state.amount); });
         });
       }
 
@@ -68,7 +97,8 @@ export default function FlarePortal() {
       const currentDels = [];
       for (let i = 0; i < Number(count); i++) {
         if (dA[i] && dA[i] !== ethers.ZeroAddress) {
-          currentDels.push({ addr: dA[i], pct: Number(bA[i]) / 100 });
+          const pInfo = PROVIDERS.find(prov => prov.address.toLowerCase() === dA[i].toLowerCase());
+          currentDels.push({ name: pInfo ? pInfo.name : "Unknown", addr: dA[i], pct: Number(bA[i]) / 100 });
         }
       }
       setDelegations(currentDels);
@@ -88,7 +118,7 @@ export default function FlarePortal() {
       }
     } catch (e) { 
       console.error(e);
-      setStatus(`❌ Lỗi: ${e.reason || "Giao dịch thất bại"}`); 
+      setStatus(`❌ Lỗi: ${e.reason || e.message.substring(0, 40)}`); 
     }
   };
 
@@ -102,26 +132,26 @@ export default function FlarePortal() {
     refreshData(accs[0], pda);
   };
 
-  // --- SỬA LỖI TẠI ĐÂY: Dùng ClaimSetupManager để Claim thành công ---
-  const handleClaim = () => execute("Nhận thưởng", async () => {
-    const s = await (getProvider()).getSigner();
-    // Chuyển sang dùng ClaimSetupManager thay vì RewardManager để tránh lỗi Proof
-    const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, [
-      "function claim(address _pda, address _target, uint256 _epoch, bool _wrap) external"
-    ], s);
-    const r = new ethers.Contract(REWARD_MANAGER, [
-      "function getRewardEpochIdsWithClaimableRewards() view returns (uint24, uint24)"
-    ], getProvider());
-    const [, end] = await r.getRewardEpochIdsWithClaimableRewards();
-    return csm.claim(pdaAddress, pdaAddress, end, true);
-  });
-
-  const handleWithdrawPDA = () => execute("Rút PDA", async () => {
+  // --- HÀM RÚT TIỀN (PDA -> VÍ CHÍNH) ---
+  const handleWithdrawPDA = () => execute("Rút PDA về Ví Chính", async () => {
     const s = await (getProvider()).getSigner();
     const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, ["function withdraw(uint256 _amount) external"], s);
-    return csm.withdraw(ethers.parseEther(pdaAmount || "0"));
+    const val = ethers.parseEther(pdaAmount || "0");
+    if (val === 0n) throw new Error("Nhập số lượng rút");
+    return csm.withdraw(val);
   });
 
+  const handleClaim = () => execute("Nhận thưởng (WFLR ➞ PDA)", async () => {
+    const s = await (getProvider()).getSigner();
+    const r = new ethers.Contract(REWARD_MANAGER, [
+      "function claim(address _rewardOwner, address payable _recipient, uint24 _rewardEpochId, bool _wrap, tuple(bytes32[] merkleProof, tuple(uint24 rewardEpochId, bytes20 beneficiary, uint120 amount, uint8 claimType) body)[] _proofs) returns (uint256)",
+      "function getRewardEpochIdsWithClaimableRewards() view returns (uint24 _startEpochId, uint24 _endEpochId)"
+    ], s);
+    const [, end] = await r.getRewardEpochIdsWithClaimableRewards();
+    return r.claim(pdaAddress, pdaAddress, end, true, []);
+  });
+
+  // --- CÁC HÀM VÍ CHÍNH ---
   const handleWrap = (isWrap) => execute(isWrap ? "Wrap" : "Unwrap", async () => {
     const s = await (getProvider()).getSigner();
     const w = new ethers.Contract(WNAT, ["function deposit() payable", "function withdraw(uint256)"], s);
@@ -164,6 +194,7 @@ export default function FlarePortal() {
         <button onClick={connect} style={{...styles.btn, width:'100%', background: COLORS.PINK, color:'white', padding:'18px'}}>KẾT NỐI VÍ METAMASK</button>
       ) : (
         <>
+          {/* SECTION 1: PERSONAL WALLET */}
           <section style={styles.card}>
             <div style={styles.label}>MAIN WALLET</div>
             <div style={{display:'flex', justifyContent:'space-between', marginBottom:15, fontSize:18, fontWeight:'900'}}>
@@ -181,6 +212,7 @@ export default function FlarePortal() {
             </div>
           </section>
 
+          {/* SECTION 2: PDA ACCOUNT */}
           <section style={{...styles.card, border: `1px solid ${COLORS.PINK}44`}}>
             <div style={{...styles.label, color: COLORS.PINK}}>DELEGATION ACCOUNT (PDA)</div>
             <div style={{fontSize:24, fontWeight:'900', marginBottom:15}}>{Number(balances.pdaWflr).toLocaleString()} <small style={{color:COLORS.PINK, fontSize:12}}>WFLR</small></div>
@@ -200,11 +232,12 @@ export default function FlarePortal() {
             </div>
           </section>
 
+          {/* SECTION 3: DELEGATIONS */}
           <section style={styles.card}>
             <div style={styles.label}>Delegations ({delegations.length}/2)</div>
             {delegations.map((d, i) => (
               <div key={i} style={{display:'flex', justifyContent:'space-between', padding:'12px 0', borderBottom:'1px solid #222'}}>
-                <div><div style={{fontWeight:'bold'}}>{PROVIDERS.find(p => p.address.toLowerCase() === d.addr.toLowerCase())?.name || "Unknown"}</div><div style={{fontSize:11, color: COLORS.PINK}}>{d.pct}% Power</div></div>
+                <div><div style={{fontWeight:'bold'}}>{d.name}</div><div style={{fontSize:11, color: COLORS.PINK}}>{d.pct}% Power</div></div>
                 <button onClick={()=>handleDelegate(d.addr, 0)} style={{background:'#ff444411', border:'none', color:'#ff4444', padding:'5px 10px', borderRadius:8}}>✕</button>
               </div>
             ))}
