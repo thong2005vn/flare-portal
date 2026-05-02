@@ -53,8 +53,11 @@ export default function FlarePortal() {
   const [pdaAddress, setPdaAddress] = useState("");
   const [balances, setBalances] = useState({ flr: "0", wflr: "0", pdaWflr: "0", reward: "0" });
   const [delegations, setDelegations] = useState([]);
+  
+  // TÁCH BIẾN NHẬP LIỆU
   const [walletAmount, setWalletAmount] = useState("");
   const [pdaAmount, setPdaAmount] = useState("");
+  
   const [status, setStatus] = useState("Sẵn sàng");
   const [providerSearch, setProviderSearch] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
@@ -66,8 +69,6 @@ export default function FlarePortal() {
     try {
       const p = getProvider();
       const wnat = new ethers.Contract(WNAT, ["function balanceOf(address) view returns (uint256)", "function delegatesOf(address) view returns (address[], uint256[], uint256, uint256)"], p);
-      
-      // Sử dụng ABI gốc của bạn để tránh lỗi cấu trúc trả về
       const rew = new ethers.Contract(REWARD_MANAGER, ["function getStateOfRewards(address _rewardOwner) view returns (tuple(uint24 rewardEpochId, bytes20 beneficiary, uint120 amount, uint8 claimType, bool initialised)[][])"], p);
 
       const [f, w, pw, rewardStates] = await Promise.all([
@@ -77,14 +78,11 @@ export default function FlarePortal() {
         rew.getStateOfRewards(pda).catch(() => [])
       ]);
 
+      const del = await wnat.delegatesOf(pda).catch(() => [[], [], 0n, 0n]);
       let totalRewardWei = 0n;
       if (Array.isArray(rewardStates)) {
         rewardStates.forEach(epochArray => {
-          if (Array.isArray(epochArray)) {
-            epochArray.forEach(state => { 
-                if (state && state.amount) totalRewardWei += BigInt(state.amount); 
-            });
-          }
+          epochArray.forEach(state => { totalRewardWei += BigInt(state.amount); });
         });
       }
 
@@ -95,7 +93,6 @@ export default function FlarePortal() {
         reward: ethers.formatEther(totalRewardWei)
       });
 
-      const del = await wnat.delegatesOf(pda).catch(() => [[], [], 0n, 0n]);
       const [dA, bA, , count] = del;
       const currentDels = [];
       for (let i = 0; i < Number(count); i++) {
@@ -105,7 +102,7 @@ export default function FlarePortal() {
         }
       }
       setDelegations(currentDels);
-    } catch (e) { console.error("Refresh Error:", e); }
+    } catch (e) { console.error(e); }
   }, [getProvider]);
 
   const execute = async (label, action) => {
@@ -121,7 +118,7 @@ export default function FlarePortal() {
       }
     } catch (e) { 
       console.error(e);
-      setStatus(`❌ Lỗi: ${e.reason || "Thất bại"}`); 
+      setStatus(`❌ Lỗi: ${e.reason || e.message.substring(0, 40)}`); 
     }
   };
 
@@ -135,24 +132,26 @@ export default function FlarePortal() {
     refreshData(accs[0], pda);
   };
 
-  // --- HÀM CLAIM SỬA LẠI ĐỂ HOẠT ĐỘNG ---
-  const handleClaim = () => execute("Nhận thưởng", async () => {
-    const s = await (getProvider()).getSigner();
-    // Dùng ClaimSetupManager để claim cho PDA (không cần Merkle Proof)
-    const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, [
-      "function claim(address _rewardOwner, address _recipient, uint256 _rewardEpoch, bool _wrap) external returns (uint256)"
-    ], s);
-    const r = new ethers.Contract(REWARD_MANAGER, ["function getRewardEpochIdsWithClaimableRewards() view returns (uint24, uint24)"], getProvider());
-    const [, end] = await r.getRewardEpochIdsWithClaimableRewards();
-    return csm.claim(pdaAddress, pdaAddress, end, true);
-  });
-
-  const handleWithdrawPDA = () => execute("Rút PDA", async () => {
+  // --- HÀM RÚT TIỀN (PDA -> VÍ CHÍNH) ---
+  const handleWithdrawPDA = () => execute("Rút PDA về Ví Chính", async () => {
     const s = await (getProvider()).getSigner();
     const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, ["function withdraw(uint256 _amount) external"], s);
-    return csm.withdraw(ethers.parseEther(pdaAmount || "0"));
+    const val = ethers.parseEther(pdaAmount || "0");
+    if (val === 0n) throw new Error("Nhập số lượng rút");
+    return csm.withdraw(val);
   });
 
+  const handleClaim = () => execute("Nhận thưởng (WFLR ➞ PDA)", async () => {
+    const s = await (getProvider()).getSigner();
+    const r = new ethers.Contract(REWARD_MANAGER, [
+      "function claim(address _rewardOwner, address payable _recipient, uint24 _rewardEpochId, bool _wrap, tuple(bytes32[] merkleProof, tuple(uint24 rewardEpochId, bytes20 beneficiary, uint120 amount, uint8 claimType) body)[] _proofs) returns (uint256)",
+      "function getRewardEpochIdsWithClaimableRewards() view returns (uint24 _startEpochId, uint24 _endEpochId)"
+    ], s);
+    const [, end] = await r.getRewardEpochIdsWithClaimableRewards();
+    return r.claim(pdaAddress, pdaAddress, end, true, []);
+  });
+
+  // --- CÁC HÀM VÍ CHÍNH ---
   const handleWrap = (isWrap) => execute(isWrap ? "Wrap" : "Unwrap", async () => {
     const s = await (getProvider()).getSigner();
     const w = new ethers.Contract(WNAT, ["function deposit() payable", "function withdraw(uint256)"], s);
@@ -195,11 +194,12 @@ export default function FlarePortal() {
         <button onClick={connect} style={{...styles.btn, width:'100%', background: COLORS.PINK, color:'white', padding:'18px'}}>KẾT NỐI VÍ METAMASK</button>
       ) : (
         <>
+          {/* SECTION 1: PERSONAL WALLET */}
           <section style={styles.card}>
             <div style={styles.label}>MAIN WALLET</div>
             <div style={{display:'flex', justifyContent:'space-between', marginBottom:15, fontSize:18, fontWeight:'900'}}>
-                <span>{Number(balances.flr).toFixed(2)} FLR</span>
-                <span>{Number(balances.wflr).toLocaleString()} WFLR</span>
+                <span>{Number(balances.flr).toFixed(2)} <small style={{fontSize:10, color:COLORS.TEXT_MUTE}}>FLR</small></span>
+                <span>{Number(balances.wflr).toLocaleString()} <small style={{fontSize:10, color:COLORS.TEXT_MUTE}}>WFLR</small></span>
             </div>
             <div style={{display:'flex', gap:8, marginBottom:12}}>
                 <input type="number" value={walletAmount} onChange={(e)=>setWalletAmount(e.target.value)} style={styles.input} placeholder="0.0"/>
@@ -212,9 +212,10 @@ export default function FlarePortal() {
             </div>
           </section>
 
+          {/* SECTION 2: PDA ACCOUNT */}
           <section style={{...styles.card, border: `1px solid ${COLORS.PINK}44`}}>
             <div style={{...styles.label, color: COLORS.PINK}}>DELEGATION ACCOUNT (PDA)</div>
-            <div style={{fontSize:24, fontWeight:'900', marginBottom:15}}>{Number(balances.pdaWflr).toLocaleString()} WFLR</div>
+            <div style={{fontSize:24, fontWeight:'900', marginBottom:15}}>{Number(balances.pdaWflr).toLocaleString()} <small style={{color:COLORS.PINK, fontSize:12}}>WFLR</small></div>
             
             <div style={{display:'flex', gap:8, marginBottom:12}}>
                 <input type="number" value={pdaAmount} onChange={(e)=>setPdaAmount(e.target.value)} style={styles.input} placeholder="Rút về ví chính..."/>
@@ -227,10 +228,11 @@ export default function FlarePortal() {
                     <div style={{fontSize:10, color: COLORS.TEXT_MUTE}}>UNCLAIMED REWARDS</div>
                     <div style={{color: COLORS.PINK, fontSize:20, fontWeight:'900'}}>+{Number(balances.reward).toFixed(2)} FLR</div>
                 </div>
-                <button onClick={handleClaim} style={{...styles.btn, background: COLORS.PINK, color:'white', padding:'12px 20px'}}>CLAIM</button>
+                <button onClick={handleClaim} disabled={Number(balances.reward) <= 0} style={{...styles.btn, background: Number(balances.reward) > 0 ? COLORS.PINK : '#222', color:'white', padding:'12px 20px'}}>CLAIM</button>
             </div>
           </section>
 
+          {/* SECTION 3: DELEGATIONS */}
           <section style={styles.card}>
             <div style={styles.label}>Delegations ({delegations.length}/2)</div>
             {delegations.map((d, i) => (
