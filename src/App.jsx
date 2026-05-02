@@ -1,6 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { ethers } from "ethers";
-// Import các hằng số từ file constants.js cùng thư mục src
 import { FLARE_CONFIG, ABIS, PROVIDERS, COLORS } from "./constants";
 
 export default function FlarePortal() {
@@ -14,13 +13,11 @@ export default function FlarePortal() {
   const [providerSearch, setProviderSearch] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // Khởi tạo Provider kết nối với MetaMask
   const getProvider = useCallback(() => {
     if (!window.ethereum) return null;
     return new ethers.BrowserProvider(window.ethereum);
   }, []);
 
-  // Hàm cập nhật toàn bộ dữ liệu số dư và ủy quyền
   const refreshData = useCallback(async (addr, pda) => {
     if (!addr || !pda) return;
     try {
@@ -28,7 +25,6 @@ export default function FlarePortal() {
       const wnat = new ethers.Contract(FLARE_CONFIG.WNAT, ABIS.WNAT, p);
       const rew = new ethers.Contract(FLARE_CONFIG.REWARD_MANAGER, ABIS.REWARD_MANAGER, p);
 
-      // Lấy số dư FLR, WFLR và phần thưởng song song để tối ưu tốc độ
       const [f, w, pw, rewardStates] = await Promise.all([
         p.getBalance(addr),
         wnat.balanceOf(addr),
@@ -38,7 +34,6 @@ export default function FlarePortal() {
 
       const del = await wnat.delegatesOf(pda).catch(() => [[], [], 0n, 0n]);
       
-      // Tính toán tổng phần thưởng từ các Epoch
       let totalRewardWei = 0n;
       if (Array.isArray(rewardStates)) {
         rewardStates.forEach(epochArray => {
@@ -57,7 +52,6 @@ export default function FlarePortal() {
         reward: ethers.formatEther(totalRewardWei)
       });
 
-      // Xử lý danh sách các đơn vị FTSO đang được ủy quyền
       const [dA, bA, , count] = del;
       const currentDels = [];
       for (let i = 0; i < Number(count); i++) {
@@ -76,7 +70,6 @@ export default function FlarePortal() {
     }
   }, [getProvider]);
 
-  // Cơ chế tự động làm mới dữ liệu mỗi 30 giây
   useEffect(() => {
     if (account && pdaAddress) {
       const interval = setInterval(() => refreshData(account, pdaAddress), 30000);
@@ -84,7 +77,6 @@ export default function FlarePortal() {
     }
   }, [account, pdaAddress, refreshData]);
 
-  // Hàm thực thi giao dịch chung
   const execute = async (label, action) => {
     try {
       setStatus(`⏳ ${label}...`);
@@ -106,7 +98,8 @@ export default function FlarePortal() {
     if (!window.ethereum) return alert("Vui lòng cài đặt MetaMask!");
     try {
       const accs = await window.ethereum.request({ method: "eth_requestAccounts" });
-      const csm = new ethers.Contract(FLARE_CONFIG.CLAIM_SETUP_MANAGER, ABIS.CLAIM_SETUP_MANAGER, await getProvider().getSigner());
+      const signer = await (await getProvider()).getSigner();
+      const csm = new ethers.Contract(FLARE_CONFIG.CLAIM_SETUP_MANAGER, ABIS.CLAIM_SETUP_MANAGER, signer);
       const pda = await csm.accountToDelegationAccount(accs[0]);
       setAccount(accs[0]);
       setPdaAddress(pda);
@@ -135,11 +128,17 @@ export default function FlarePortal() {
     return csm.withdraw(ethers.parseEther(pdaAmount || "0"));
   });
 
+  // PHẦN SỬA ĐỔI CHÍNH: Gọi claim qua ClaimSetupManager thay vì trực tiếp Reward Manager
   const handleClaim = () => execute("Nhận thưởng", async () => {
     const s = await (getProvider()).getSigner();
+    const csm = new ethers.Contract(FLARE_CONFIG.CLAIM_SETUP_MANAGER, ABIS.CLAIM_SETUP_MANAGER, s);
     const r = new ethers.Contract(FLARE_CONFIG.REWARD_MANAGER, ABIS.REWARD_MANAGER, s);
-    const [, end] = await r.getRewardEpochIdsWithClaimableRewards();
-    return r.claim(pdaAddress, pdaAddress, end, true, []);
+    
+    const [start, end] = await r.getRewardEpochIdsWithClaimableRewards();
+    
+    // Thực hiện claim tất cả các epoch hiện có thông qua Manager
+    // Tham số: (địa chỉ PDA, địa chỉ nhận thưởng, epoch cuối, tự động wrap)
+    return csm.claim(pdaAddress, pdaAddress, end, true, { gasLimit: 1000000 });
   });
 
   const handleDelegate = (target, pct = 50) => execute(pct === 0 ? "Hủy ủy quyền" : "Ủy quyền", async () => {
@@ -170,7 +169,6 @@ export default function FlarePortal() {
         <button onClick={connect} style={{...styles.btn, width:'100%', background: COLORS.PINK, color:'white', fontSize: '14px', height: '55px'}}>KẾT NỐI VÍ METAMASK</button>
       ) : (
         <>
-          {/* PHẦN VÍ CHÍNH */}
           <section style={styles.card}>
             <div style={styles.label}>VÍ CHÍNH (WALLET)</div>
             <div style={{display:'flex', justifyContent:'space-between', marginBottom:15, fontSize:18, fontWeight:'bold'}}>
@@ -188,7 +186,6 @@ export default function FlarePortal() {
             </div>
           </section>
 
-          {/* TÀI KHOẢN ỦY QUYỀN - PDA */}
           <section style={{...styles.card, border: `1px solid ${COLORS.PINK}33`}}>
             <div style={{...styles.label, color: COLORS.PINK}}>TÀI KHOẢN ỦY QUYỀN (PDA)</div>
             <div style={{fontSize:24, fontWeight:'900', marginBottom:15}}>{Number(balances.pdaWflr).toLocaleString()} <small style={{fontSize:10, color: COLORS.TEXT_MUTE}}>WFLR</small></div>
@@ -207,7 +204,6 @@ export default function FlarePortal() {
             </div>
           </section>
 
-          {/* DANH SÁCH ỦY QUYỀN */}
           <section style={styles.card}>
             <div style={styles.label}>ĐANG ỦY QUYỀN ({delegations.length}/2)</div>
             {delegations.length === 0 && <div style={{fontSize: 12, color: COLORS.TEXT_MUTE, textAlign: 'center', padding: '10px 0'}}>Chưa có ủy quyền nào</div>}
@@ -221,7 +217,6 @@ export default function FlarePortal() {
               </div>
             ))}
             
-            {/* TÌM KIẾM PROVIDER */}
             <div style={{position:'relative', marginTop:15}}>
                 <input 
                   type="text" 
