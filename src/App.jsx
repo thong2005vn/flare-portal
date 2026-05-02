@@ -90,7 +90,7 @@ export default function FlarePortal() {
       }
     } catch (e) {
       console.error(e);
-      setStatus(`❌ Lỗi: ${e.reason || "Giao dịch thất bại"}`);
+      setStatus(`❌ Lỗi: ${e.reason || e.message || "Giao dịch thất bại"}`);
     }
   };
 
@@ -98,7 +98,8 @@ export default function FlarePortal() {
     if (!window.ethereum) return alert("Vui lòng cài đặt MetaMask!");
     try {
       const accs = await window.ethereum.request({ method: "eth_requestAccounts" });
-      const signer = await (await getProvider()).getSigner();
+      const p = getProvider();
+      const signer = await p.getSigner();
       const csm = new ethers.Contract(FLARE_CONFIG.CLAIM_SETUP_MANAGER, ABIS.CLAIM_SETUP_MANAGER, signer);
       const pda = await csm.accountToDelegationAccount(accs[0]);
       setAccount(accs[0]);
@@ -128,17 +129,44 @@ export default function FlarePortal() {
     return csm.withdraw(ethers.parseEther(pdaAmount || "0"));
   });
 
-  // PHẦN SỬA ĐỔI CHÍNH: Gọi claim qua ClaimSetupManager thay vì trực tiếp Reward Manager
+  // PHẦN ĐÃ SỬA: Tự động lấy Proof từ API và Claim về PDA dưới dạng WFLR
   const handleClaim = () => execute("Nhận thưởng", async () => {
     const s = await (getProvider()).getSigner();
-    const csm = new ethers.Contract(FLARE_CONFIG.CLAIM_SETUP_MANAGER, ABIS.CLAIM_SETUP_MANAGER, s);
     const r = new ethers.Contract(FLARE_CONFIG.REWARD_MANAGER, ABIS.REWARD_MANAGER, s);
     
-    const [start, end] = await r.getRewardEpochIdsWithClaimableRewards();
+    setStatus("⏳ Đang lấy Proof từ Flare Explorer...");
+    const apiUrl = `https://flare-explorer.flare.network/api?module=reward&action=get_unclaimed_rewards&address=${pdaAddress}`;
     
-    // Thực hiện claim tất cả các epoch hiện có thông qua Manager
-    // Tham số: (địa chỉ PDA, địa chỉ nhận thưởng, epoch cuối, tự động wrap)
-    return csm.claim(pdaAddress, pdaAddress, end, true, { gasLimit: 1000000 });
+    const response = await fetch(apiUrl);
+    const json = await response.json();
+
+    if (json.status !== "1" || !json.result || json.result.length === 0) {
+      throw new Error("Không có phần thưởng khả dụng để claim.");
+    }
+
+    // Gom nhóm Proof theo Epoch
+    const claimsByEpoch = json.result.reduce((acc, item) => {
+      const eid = item.rewardEpochId;
+      if (!acc[eid]) acc[eid] = [];
+      acc[eid].push({
+        merkleProof: item.merkleProof,
+        body: {
+          rewardEpochId: eid,
+          beneficiary: item.beneficiary,
+          amount: item.amount,
+          claimType: item.claimType
+        }
+      });
+      return acc;
+    }, {});
+
+    const targetEpoch = Object.keys(claimsByEpoch)[0];
+    const proofs = claimsByEpoch[targetEpoch];
+
+    setStatus(`⏳ Đang gửi giao dịch Claim Epoch ${targetEpoch}...`);
+
+    // Gửi lệnh claim: Chủ PDA claim cho chính mình, chọn Wrap = true để nhận WFLR
+    return r.claim(pdaAddress, pdaAddress, targetEpoch, true, proofs, { gasLimit: 800000 });
   });
 
   const handleDelegate = (target, pct = 50) => execute(pct === 0 ? "Hủy ủy quyền" : "Ủy quyền", async () => {
