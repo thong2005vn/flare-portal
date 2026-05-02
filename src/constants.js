@@ -1,7 +1,6 @@
 // src/constants.js
 
 export const FLARE_CONFIG = {
-  // Đã Checksum thủ công: viết hoa đúng chuẩn EIP-55
   WNAT: "0x1D80c49BbBCd1C0911346656B529DF9E5c2F783d",
   REWARD_MANAGER: "0xC8f55c5aA2C752eE285Bd872855C749f4ee6239B",
   CLAIM_SETUP_MANAGER: "0xD56c0Ea37B848939B59e6F5Cda119b3fA473b5eB",
@@ -17,20 +16,19 @@ export const ABIS = {
     "function delegatesOf(address) view returns (address[], uint256[], uint256, uint256)"
   ],
   REWARD_MANAGER: [
-    "function getStateOfRewards(address) view returns (tuple(uint24 rewardEpochId, bytes20 beneficiary, uint120 amount, uint8 claimType, bool initialised)[][])",
+    // ĐÃ CẬP NHẬT: Thêm trường 'bool claimed' vào cuối Tuple để App nhận diện được trạng thái claim
+    "function getStateOfRewards(address) view returns (tuple(uint24 rewardEpochId, bytes20 beneficiary, uint120 amount, uint8 claimType, bool initialised, bool claimed)[][])",
     "function claim(address, address, uint24, bool, tuple[]) returns (uint256)",
     "function getRewardEpochIdsWithClaimableRewards() view returns (uint24, uint24)"
   ],
   CLAIM_SETUP_MANAGER: [
     "function accountToDelegationAccount(address) view returns (address)",
     "function withdraw(uint256) external",
-    // Thêm hàm claim để nút hoạt động
     "function claim(address _delegationAccount, address payable _recipient, uint256 _rewardEpoch, bool _wrap) external returns (uint256)"
   ]
 };
 
 export const PROVIDERS = [
-  // Đã chuẩn hóa Checksum cho Zellic để không bị lỗi so sánh
   { name: "Zellic", address: "0x76E5591dDa384A30eEb53fD4059C9570eE072E7e" },
   { name: "African Proofs", address: "0x7b3F2a1C8E9d4F2A1B3C4D5E6F7A8B9C0D1E2F3A" },
   { name: "Enosys", address: "0x8C6f28f2F1A2C1eB8C9F9bA2A5e3fC1A2B3C4D5E" },
