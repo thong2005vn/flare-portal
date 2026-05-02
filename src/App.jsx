@@ -214,7 +214,7 @@ export default function FlarePortal() {
 
           {/* SECTION 2: PDA ACCOUNT */}
           <section style={{...styles.card, border: `1px solid ${COLORS.PINK}44`}}>
-            <div style={{...styles.label, color: COLORS.PINK}}>DELEGATION ACCOUNT (PDA)</div>
+            <div style={{...styles.label, color: COLORS.AMBER}}>DELEGATION ACCOUNT (PDA)</div>
             <div style={{fontSize:24, fontWeight:'900', marginBottom:15}}>{Number(balances.pdaWflr).toLocaleString()} <small style={{color:COLORS.PINK, fontSize:12}}>WFLR</small></div>
             
             <div style={{display:'flex', gap:8, marginBottom:12}}>
