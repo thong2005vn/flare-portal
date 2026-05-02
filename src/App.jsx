@@ -18,7 +18,7 @@ export default function FlarePortal() {
     return new ethers.BrowserProvider(window.ethereum);
   }, []);
 
-  // CẬP NHẬT: Logic refreshData lọc chính xác phần thưởng chưa claim
+  // REFRESH DATA: Đã sửa logic lọc phần thưởng để tránh bị ẩn tiền
   const refreshData = useCallback(async (addr, pda) => {
     if (!addr || !pda) return;
     try {
@@ -38,11 +38,13 @@ export default function FlarePortal() {
       let totalRewardWei = 0n;
       if (Array.isArray(rewardStates)) {
         rewardStates.forEach(epochArray => {
-          if (epochArray) {
+          if (Array.isArray(epochArray)) {
             epochArray.forEach(state => { 
-              // CHỈ cộng dồn nếu 'claimed' là false (Chưa nhận)
-              if (state.amount && state.claimed === false) {
-                totalRewardWei += BigInt(state.amount); 
+              const amt = state.amount ? BigInt(state.amount) : 0n;
+              // LOGIC MỚI: Chỉ bỏ qua nếu đã claim (true). 
+              // Nếu là false hoặc undefined/null thì vẫn cộng dồn để hiển thị.
+              if (amt > 0n && state.claimed !== true) {
+                totalRewardWei += amt; 
               }
             });
           }
@@ -76,6 +78,7 @@ export default function FlarePortal() {
 
   useEffect(() => {
     if (account && pdaAddress) {
+      refreshData(account, pdaAddress);
       const interval = setInterval(() => refreshData(account, pdaAddress), 30000);
       return () => clearInterval(interval);
     }
@@ -90,7 +93,7 @@ export default function FlarePortal() {
         setStatus(`✅ ${label} thành công!`);
         setWalletAmount("");
         setPdaAmount("");
-        setTimeout(() => refreshData(account, pdaAddress), 1500);
+        setTimeout(() => refreshData(account, pdaAddress), 2000);
       }
     } catch (e) {
       console.error(e);
@@ -144,7 +147,7 @@ export default function FlarePortal() {
     const json = await response.json();
 
     if (json.status !== "1" || !json.result || json.result.length === 0) {
-      throw new Error("API chưa cập nhật Proof. Vui lòng thử lại sau vài phút.");
+      throw new Error("Không tìm thấy Proof. Có thể phần thưởng đã được nhận hoặc chưa tới đợt.");
     }
 
     const claimsByEpoch = json.result.reduce((acc, item) => {
@@ -245,7 +248,6 @@ export default function FlarePortal() {
             </div>
           </section>
 
-          {/* Phần ủy quyền giữ nguyên */}
           <section style={styles.card}>
             <div style={styles.label}>ĐANG ỦY QUYỀN ({delegations.length}/2)</div>
             {delegations.length === 0 && <div style={{fontSize: 12, color: COLORS.TEXT_MUTE, textAlign: 'center', padding: '10px 0'}}>Chưa có ủy quyền nào</div>}
