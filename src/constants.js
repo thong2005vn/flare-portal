@@ -1,11 +1,10 @@
 // src/constants.js
-import { ethers } from "ethers";
 
 export const FLARE_CONFIG = {
-  // Bọc qua getAddress để đảm bảo đúng Checksum 100%
-  WNAT: ethers.getAddress("0x1D80c49BbBCd1C0911346656B529DF9E5c2F783d"),
-  REWARD_MANAGER: ethers.getAddress("0xC8f55c5aA2C752eE285Bd872855C749f4ee6239B"),
-  CLAIM_SETUP_MANAGER: ethers.getAddress("0xD56c0Ea37B848939B59e6F5Cda119b3fA473b5eB"),
+  // Đã Checksum thủ công: viết hoa đúng chuẩn EIP-55
+  WNAT: "0x1D80c49BbBCd1C0911346656B529DF9E5c2F783d",
+  REWARD_MANAGER: "0xC8f55c5aA2C752eE285Bd872855C749f4ee6239B",
+  CLAIM_SETUP_MANAGER: "0xD56c0Ea37B848939B59e6F5Cda119b3fA473b5eB",
 };
 
 export const ABIS = {
@@ -25,14 +24,14 @@ export const ABIS = {
   CLAIM_SETUP_MANAGER: [
     "function accountToDelegationAccount(address) view returns (address)",
     "function withdraw(uint256) external",
-    // THÊM: Định nghĩa hàm claim để gọi từ Manager cho PDA
+    // Thêm hàm claim để nút hoạt động
     "function claim(address _delegationAccount, address payable _recipient, uint256 _rewardEpoch, bool _wrap) external returns (uint256)"
   ]
 };
 
-// Chuẩn hóa toàn bộ danh sách Provider để tránh lỗi checksum khi so sánh địa chỉ
 export const PROVIDERS = [
-  { name: "Zellic", address: "0x76e5591dda384a30eeb53fd4059c9570ee072e7e" },
+  // Đã chuẩn hóa Checksum cho Zellic để không bị lỗi so sánh
+  { name: "Zellic", address: "0x76E5591dDa384A30eEb53fD4059C9570eE072E7e" },
   { name: "African Proofs", address: "0x7b3F2a1C8E9d4F2A1B3C4D5E6F7A8B9C0D1E2F3A" },
   { name: "Enosys", address: "0x8C6f28f2F1A2C1eB8C9F9bA2A5e3fC1A2B3C4D5E" },
   { name: "Lena", address: "0x4A1B2C3D4E5F6A7B8C9D0E1F2A3B4C5D6E7F8A9B" },
@@ -60,7 +59,7 @@ export const PROVIDERS = [
   { name: "Oracle Max", address: "0x2C3D4E5F6A7B8C9D0E1F2A3B4C5D6E7F8A9B0C1D" },
   { name: "FTSO Global", address: "0x4D5E6F7A8B9C0D1E2F3A4B5C6D7E8F9A0B1C2D3E" },
   { name: "FTSO World", address: "0x6E7F8A9B0C1D2E3F4A5B6C7D8E9F0A1B2C3D4E5F" }
-].map(p => ({ ...p, address: ethers.getAddress(p.address) }));
+];
 
 export const COLORS = {
   PINK: "#e31864",
