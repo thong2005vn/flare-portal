@@ -202,7 +202,7 @@ export default function FlarePortal() {
                 <span>{Number(balances.wflr).toLocaleString()} <small style={{fontSize:18, color:COLORS.PINK}}>WFLR</small></span>
             </div>
             <div style={{display:'flex', gap:8, marginBottom:12}}>
-                <input type="number" value={walletAmount} onChange={(e)=>setWalletAmount(e.target.value)} style={styles.input} placeholder="0.00"/>
+                <input type="number" value={walletAmount} onChange={(e)=>setWalletAmount(e.target.value)} style={styles.input} placeholder="Điền số lượng FLR/WFLR trước... "/>
                 <button onClick={()=>setWalletAmount(balances.flr)} style={{...styles.btn, background: COLORS.PINK, color:'white'}}>MAX</button>
             </div>
             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1.2fr', gap:8}}>
