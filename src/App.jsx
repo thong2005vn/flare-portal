@@ -186,7 +186,7 @@ export default function FlarePortal() {
   return (
     <div style={styles.container}>
       <header style={{textAlign:'center', marginBottom:'25px'}}>
-        <h2 style={{color: COLORS.PINK, letterSpacing: '3px', margin: 0}}>OZPRO FLARE <span style={{fontWeight:300, color:'#fff'}}>(TRÌNH QUẢN LÝ)</span></h2>
+        <h2 style={{color: COLORS.PINK, letterSpacing: '3px', margin: 0}}>OZPRO FLARE MANAGAER <span style={{fontWeight:300, color:'#fff'}}>(TRÌNH QUẢN LÝ TÀI SẢN FLR)</span></h2>
         <div style={{width:'40px', height:'2px', background: COLORS.PINK, margin:'8px auto'}}></div>
       </header>
       
