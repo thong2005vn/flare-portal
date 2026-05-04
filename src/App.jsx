@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { ethers } from "ethers";
 
 // --- CẤU HÌNH HỆ THỐNG FLARE ---
@@ -53,14 +53,24 @@ export default function FlarePortal() {
   const [pdaAddress, setPdaAddress] = useState("");
   const [balances, setBalances] = useState({ flr: "0", wflr: "0", pdaWflr: "0", reward: "0" });
   const [delegations, setDelegations] = useState([]);
-  
-  // TÁCH BIẾN NHẬP LIỆU
   const [walletAmount, setWalletAmount] = useState("");
   const [pdaAmount, setPdaAmount] = useState("");
-  
   const [status, setStatus] = useState("Sẵn sàng");
   const [providerSearch, setProviderSearch] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
+  
+  // State mới để lưu provider đang chờ xác nhận
+  const [pendingProvider, setPendingProvider] = useState(null);
+  const dropdownRef = useRef(null);
+
+  // Đóng dropdown khi click ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+        if (dropdownRef.current && !dropdownRef.current.contains(event.target)) setShowDropdown(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const getProvider = useCallback(() => new ethers.BrowserProvider(window.ethereum), []);
 
@@ -114,6 +124,8 @@ export default function FlarePortal() {
         setStatus(`✅ ${label} thành công!`);
         setWalletAmount("");
         setPdaAmount("");
+        setPendingProvider(null); // Reset trạng thái chờ
+        setProviderSearch("");
         setTimeout(() => refreshData(account, pdaAddress), 1500);
       }
     } catch (e) { 
@@ -132,7 +144,6 @@ export default function FlarePortal() {
     refreshData(accs[0], pda);
   };
 
-  // --- HÀM RÚT TIỀN (PDA -> VÍ CHÍNH) ---
   const handleWithdrawPDA = () => execute("Rút PDA về Ví Chính", async () => {
     const s = await (getProvider()).getSigner();
     const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, ["function withdraw(uint256 _amount) external"], s);
@@ -151,7 +162,6 @@ export default function FlarePortal() {
     return r.claim(pdaAddress, pdaAddress, end, true, []);
   });
 
-  // --- CÁC HÀM VÍ CHÍNH ---
   const handleWrap = (isWrap) => execute(isWrap ? "Wrap" : "Unwrap", async () => {
     const s = await (getProvider()).getSigner();
     const w = new ethers.Contract(WNAT, ["function deposit() payable", "function withdraw(uint256)"], s);
@@ -194,7 +204,6 @@ export default function FlarePortal() {
         <button onClick={connect} style={{...styles.btn, width:'100%', background: COLORS.PINK, color:'white', padding:'18px'}}>KẾT NỐI VÍ METAMASK</button>
       ) : (
         <>
-          {/* SECTION 1: PERSONAL WALLET */}
           <section style={{...styles.card, border: `2px solid ${COLORS.PINK}44`}}>
             <div style={{...styles.label, color: COLORS.PINK}}>MAIN WALLET</div>
             <div style={{display:'flex', justifyContent:'space-between', marginBottom:15, fontSize:24, fontWeight:'900'}}>
@@ -212,7 +221,6 @@ export default function FlarePortal() {
             </div>
           </section>
 
-          {/* SECTION 2: PDA ACCOUNT */}
           <section style={{...styles.card, border: `2px solid ${COLORS.AMBER}44`}}>
             <div style={{...styles.label, color: COLORS.AMBER}}>DELEGATION ACCOUNT (PDA)</div>
             <div style={{fontSize:24, fontWeight:'900', marginBottom:15}}>{Number(balances.pdaWflr).toLocaleString()} <small style={{color:COLORS.AMBER, fontSize:18}}>WFLR</small></div>
@@ -232,7 +240,7 @@ export default function FlarePortal() {
             </div>
           </section>
 
-          {/* SECTION 3: DELEGATIONS */}
+          {/* SECTION 3: DELEGATIONS (ĐÃ CẬP NHẬT DROPDOWN & CONFIRM) */}
           <section style={{...styles.card, border: `2px solid ${COLORS.PINK}44`}}>
             <div style={styles.label}>Delegations ({delegations.length}/2)</div>
             {delegations.map((d, i) => (
@@ -241,16 +249,55 @@ export default function FlarePortal() {
                 <button onClick={()=>handleDelegate(d.addr, 0)} style={{background:'#ff444411', border:'none', color:'#ff4444', padding:'5px 10px', borderRadius:8}}>✕</button>
               </div>
             ))}
-            <div style={{position:'relative', marginTop:12}}>
-                <input type="text" placeholder="Tìm Provider..." value={providerSearch} onFocus={()=>setShowDropdown(true)} onChange={(e)=>setProviderSearch(e.target.value)} style={styles.input}/>
+            
+            <div ref={dropdownRef} style={{position:'relative', marginTop:12}}>
+                <div style={{position:'relative', display:'flex', alignItems:'center'}}>
+                  <span style={{position:'absolute', left:12, color: COLORS.TEXT_MUTE}}>🔍</span>
+                  <input 
+                    type="text" 
+                    placeholder="Tìm Provider..." 
+                    value={providerSearch} 
+                    onFocus={()=>setShowDropdown(true)} 
+                    onChange={(e)=>setProviderSearch(e.target.value)} 
+                    style={{...styles.input, paddingLeft: 35, width: '100%', boxSizing:'border-box'}}
+                  />
+                </div>
+
                 {showDropdown && (
-                    <div style={{position:'absolute', bottom:'110%', left:0, right:0, background:'#181818', borderRadius:15, border:'1px solid #333', maxHeight:150, overflowY:'auto', zIndex:100}}>
+                    <div style={{position:'absolute', bottom:'110%', left:0, right:0, background:'#181818', borderRadius:15, border:'1px solid #333', maxHeight:150, overflowY:'auto', zIndex:100, boxShadow: '0 -10px 20px rgba(0,0,0,0.5)'}}>
                         {filteredProviders.map(p => (
-                            <div key={p.address} onClick={()=>{handleDelegate(p.address, 50); setShowDropdown(false);}} style={{padding:12, fontSize:13, borderBottom:'1px solid #222', cursor:'pointer'}}>
+                            <div 
+                              key={p.address} 
+                              onClick={()=>{ setPendingProvider(p); setProviderSearch(p.name); setShowDropdown(false); }} 
+                              style={{padding:12, fontSize:13, borderBottom:'1px solid #222', cursor:'pointer'}}
+                            >
                                 {p.name} <span style={{color: COLORS.PINK, float:'right'}}>50%</span>
                             </div>
                         ))}
                     </div>
+                )}
+
+                {/* KHUNG XÁC NHẬN SAU KHI CHỌN */}
+                {pendingProvider && (
+                  <div style={{marginTop: 12, padding: 12, background: 'rgba(227, 24, 100, 0.1)', borderRadius: 16, border: `1px dashed ${COLORS.PINK}`, textAlign:'center'}}>
+                    <div style={{fontSize:12, marginBottom:8}}>Ủy quyền cho <b>{pendingProvider.name}</b>?</div>
+                    <button 
+                      onClick={() => handleDelegate(pendingProvider.address, 50)} 
+                      style={{...styles.btn, background: COLORS.PINK, color:'white', width: '100%', padding: '10px'}}
+                    >
+                      KÝ XÁC NHẬN (50%)
+                    </button>
+                    <div 
+                      onClick={() => {
+                        setPendingProvider(null);   // Xóa provider đang chờ
+                        setProviderSearch("");     // Reset ô nhập liệu về trống
+                        setShowDropdown(false);    // Đóng dropdown (nếu đang mở)
+                      }} 
+                      style={{fontSize:10, marginTop:8, color: COLORS.TEXT_MUTE, cursor:'pointer', textDecoration:'underline'}}
+                    >
+                      Hủy và chọn lại
+                    </div>
+                  </div>
                 )}
             </div>
           </section>
