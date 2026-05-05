@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { ethers } from "ethers";
 
 // --- CẤU HÌNH HỆ THỐNG FLARE ---
@@ -58,12 +58,27 @@ export default function FlarePortal() {
   const [status, setStatus] = useState("Sẵn sàng");
   const [providerSearch, setProviderSearch] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
-  
-  // State mới để lưu provider đang chờ xác nhận
   const [pendingProvider, setPendingProvider] = useState(null);
+  const [flrPrice, setFlrPrice] = useState(0); 
+
   const dropdownRef = useRef(null);
 
-  // Đóng dropdown khi click ra ngoài
+  // --- MỚI: FETCH GIÁ FLR ---
+  useEffect(() => {
+    const getPrice = async () => {
+      try {
+        const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=flare-networks&vs_currencies=usd");
+        const data = await res.json();
+        setFlrPrice(data["flare-networks"].usd);
+      } catch (e) { console.error("Lỗi lấy giá:", e); }
+    };
+    getPrice();
+    const interval = setInterval(getPrice, 60000); // Cập nhật mỗi phút
+    return () => clearInterval(interval);
+  }, []);
+
+  const toUSD = (amt) => `$${(Number(amt) * flrPrice).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
   useEffect(() => {
     const handleClickOutside = (event) => {
         if (dropdownRef.current && !dropdownRef.current.contains(event.target)) setShowDropdown(false);
@@ -124,7 +139,7 @@ export default function FlarePortal() {
         setStatus(`✅ ${label} thành công!`);
         setWalletAmount("");
         setPdaAmount("");
-        setPendingProvider(null); // Reset trạng thái chờ
+        setPendingProvider(null);
         setProviderSearch("");
         setTimeout(() => refreshData(account, pdaAddress), 1500);
       }
@@ -190,7 +205,8 @@ export default function FlarePortal() {
     card: { boxSizing: 'border-box', background: COLORS.SURFACE, padding: "20px", borderRadius: "24px", marginBottom: "16px", border: "1px solid #1f1f1f" },
     label: { fontSize: "11px", color: COLORS.TEXT_MUTE, fontWeight: "800", letterSpacing: "1px", marginBottom: "12px", textTransform: "uppercase" },
     input: { flex: 1, padding: "12px", borderRadius: "14px", background: "#080808", color: "white", border: "1px solid #222", outline: "none" },
-    btn: { padding: "12px", borderRadius: "14px", border: "none", cursor: "pointer", fontWeight: "bold", fontSize: "12px" }
+    btn: { padding: "12px", borderRadius: "14px", border: "none", cursor: "pointer", fontWeight: "bold", fontSize: "12px" },
+    usdLabel: { fontSize: "12px", color: COLORS.TEXT_MUTE, marginTop: "2px" } // Style cho phần USD
   };
 
   return (
@@ -206,9 +222,15 @@ export default function FlarePortal() {
         <>
           <section style={{...styles.card, border: `2px solid ${COLORS.PINK}44`}}>
             <div style={{...styles.label, color: COLORS.PINK}}>MAIN WALLET</div>
-            <div style={{display:'flex', justifyContent:'space-between', marginBottom:15, fontSize:24, fontWeight:'900'}}>
-                <span>{Number(balances.flr).toFixed(2)} <small style={{fontSize:18, color:COLORS.PINK}}>FLR</small></span>
-                <span>{Number(balances.wflr).toLocaleString()} <small style={{fontSize:18, color:COLORS.PINK}}>WFLR</small></span>
+            <div style={{display:'flex', justifyContent:'space-between', marginBottom:15}}>
+                <div>
+                  <div style={{fontSize:24, fontWeight:'900'}}>{Number(balances.flr).toFixed(2)} <small style={{fontSize:18, color:COLORS.PINK}}>FLR</small></div>
+                  <div style={styles.usdLabel}>{toUSD(balances.flr)}</div>
+                </div>
+                <div style={{textAlign: 'right'}}>
+                  <div style={{fontSize:24, fontWeight:'900'}}>{Number(balances.wflr).toLocaleString()} <small style={{fontSize:18, color:COLORS.PINK}}>WFLR</small></div>
+                  <div style={styles.usdLabel}>{toUSD(balances.wflr)}</div>
+                </div>
             </div>
             <div style={{display:'flex', gap:8, marginBottom:12}}>
                 <input type="number" value={walletAmount} onChange={(e)=>setWalletAmount(e.target.value)} style={styles.input} placeholder="Điền số lượng FLR/WFLR trước... "/>
@@ -223,7 +245,10 @@ export default function FlarePortal() {
 
           <section style={{...styles.card, border: `2px solid ${COLORS.AMBER}44`}}>
             <div style={{...styles.label, color: COLORS.AMBER}}>DELEGATION ACCOUNT (PDA)</div>
-            <div style={{fontSize:24, fontWeight:'900', marginBottom:15}}>{Number(balances.pdaWflr).toLocaleString()} <small style={{color:COLORS.AMBER, fontSize:18}}>WFLR</small></div>
+            <div style={{marginBottom: 15}}>
+                <div style={{fontSize:24, fontWeight:'900'}}>{Number(balances.pdaWflr).toLocaleString()} <small style={{color:COLORS.AMBER, fontSize:18}}>WFLR</small></div>
+                <div style={styles.usdLabel}>{toUSD(balances.pdaWflr)}</div>
+            </div>
             
             <div style={{display:'flex', gap:8, marginBottom:12}}>
                 <input type="number" value={pdaAmount} onChange={(e)=>setPdaAmount(e.target.value)} style={styles.input} placeholder="Điền số lượng WFLR cần rút..."/>
@@ -235,12 +260,12 @@ export default function FlarePortal() {
                 <div>
                     <div style={{fontSize:10, color: COLORS.AMBER}}>UNCLAIMED REWARDS</div>
                     <div style={{color: COLORS.AMBER, fontSize:20, fontWeight:'900'}}>+{Number(balances.reward).toFixed(2)} FLR</div>
+                    <div style={styles.usdLabel}>≈ {toUSD(balances.reward)}</div>
                 </div>
                 <button onClick={handleClaim} disabled={Number(balances.reward) <= 0} style={{...styles.btn, background: Number(balances.reward) > 0 ? COLORS.AMBER : '#222', color:'white', padding:'12px 20px'}}>CLAIM</button>
             </div>
           </section>
 
-          {/* SECTION 3: DELEGATIONS (ĐÃ CẬP NHẬT DROPDOWN & CONFIRM) */}
           <section style={{...styles.card, border: `2px solid ${COLORS.PINK}44`}}>
             <div style={styles.label}>Delegations ({delegations.length}/2)</div>
             {delegations.map((d, i) => (
@@ -277,7 +302,6 @@ export default function FlarePortal() {
                     </div>
                 )}
 
-                {/* KHUNG XÁC NHẬN SAU KHI CHỌN */}
                 {pendingProvider && (
                   <div style={{marginTop: 12, padding: 12, background: 'rgba(227, 24, 100, 0.1)', borderRadius: 16, border: `1px dashed ${COLORS.PINK}`, textAlign:'center'}}>
                     <div style={{fontSize:12, marginBottom:8}}>Ủy quyền cho <b>{pendingProvider.name}</b>?</div>
@@ -289,9 +313,9 @@ export default function FlarePortal() {
                     </button>
                     <div 
                       onClick={() => {
-                        setPendingProvider(null);   // Xóa provider đang chờ
-                        setProviderSearch("");     // Reset ô nhập liệu về trống
-                        setShowDropdown(false);    // Đóng dropdown (nếu đang mở)
+                        setPendingProvider(null);
+                        setProviderSearch("");
+                        setShowDropdown(false);
                       }} 
                       style={{fontSize:10, marginTop:8, color: COLORS.TEXT_MUTE, cursor:'pointer', textDecoration:'underline'}}
                     >
