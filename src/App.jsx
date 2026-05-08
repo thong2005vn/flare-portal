@@ -23,6 +23,7 @@ const PROVIDERS = [
   { name: "Enosys", address: "0x8C6f28f2F1A2C1eB8C9F9bA2A5e3fC1A2B3C4D5E" },
   { name: "Lena", address: "0x4A1B2C3D4E5F6A7B8C9D0E1F2A3B4C5D6E7F8A9B" },
   { name: "A-FTSO", address: "0x9F8E7D6C5B4A3F2E1D0C9B8A7E6D5C4B3A2F1E0D" },
+  { name: "AU", address: "0x4990320858ae3528b645c60059281a66c3488888" },
   { name: "Flare Oracle", address: "0x1A2B3C4D5E6F7A8B9C0D1E2F3A4B5C6D7E8F9A0B" },
   { name: "WaveLabs", address: "0x3C4D5E6F7A8B9C0D1E2F3A4B5C6D7E8F9A0B1C2D" },
   { name: "Alpha Oracle", address: "0x5E6F7A8B9C0D1E2F3A4B5C6D7E8F9A0B1C2D3E4F" },
@@ -60,11 +61,44 @@ export default function FlarePortal() {
   const [providerSearch, setProviderSearch] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
   const [pendingProvider, setPendingProvider] = useState(null);
-  const [prices, setPrices] = useState({ btc: 0, eth: 0, xrp: 0, flr: 0, sgb: 0, ltc: 0, doge: 0 });
+  const [prices, setPrices] = useState({ btc: 0, eth: 0, xrp: 0, flr: 0, sgb: 0, ltc: 0, doge: 0 }); 
+
+  // --- LOGIC ĐẾM NGƯỢC ---
+  const [timeLeft, setTimeLeft] = useState(0);
+
+  useEffect(() => {
+    const savedEndTime = localStorage.getItem("claim_countdown_end");
+    if (savedEndTime) {
+      const diff = Math.floor((Number(savedEndTime) - Date.now()) / 1000);
+      if (diff > 0) setTimeLeft(diff);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (timeLeft <= 0) return;
+    const timer = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          localStorage.removeItem("claim_countdown_end");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [timeLeft]);
+
+  const formatFullTime = (seconds) => {
+    const d = Math.floor(seconds / (3600 * 24));
+    const h = Math.floor((seconds % (3600 * 24)) / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    const pad = (n) => n.toString().padStart(2, "0");
+    return `${pad(d)}d : ${pad(h)}h : ${pad(m)}m : ${pad(s)}s`;
+  };
 
   const dropdownRef = useRef(null);
 
-  // --- LẤY GIÁ TOKEN ---
   useEffect(() => {
     const getAllPrices = async () => {
       try {
@@ -87,20 +121,16 @@ export default function FlarePortal() {
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) setShowDropdown(false);
+        if (dropdownRef.current && !dropdownRef.current.contains(event.target)) setShowDropdown(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // --- LOGIC WEB3 ---
-  const getProvider = useCallback(() => {
-    if (!window.ethereum) return null;
-    return new ethers.BrowserProvider(window.ethereum);
-  }, []);
+  const getProvider = useCallback(() => new ethers.BrowserProvider(window.ethereum), []);
 
   const refreshData = useCallback(async (addr, pda) => {
-    if (!addr || !pda || !window.ethereum) return;
+    if (!addr || !pda) return;
     try {
       const p = getProvider();
       const wnat = new ethers.Contract(WNAT, ["function balanceOf(address) view returns (uint256)", "function delegatesOf(address) view returns (address[], uint256[], uint256, uint256)"], p);
@@ -119,12 +149,7 @@ export default function FlarePortal() {
         });
       }
 
-      setBalances({ 
-        flr: ethers.formatEther(f), 
-        wflr: ethers.formatEther(w), 
-        pdaWflr: ethers.formatEther(pw), 
-        reward: ethers.formatEther(totalRewardWei) 
-      });
+      setBalances({ flr: ethers.formatEther(f), wflr: ethers.formatEther(w), pdaWflr: ethers.formatEther(pw), reward: ethers.formatEther(totalRewardWei) });
 
       const [dA, bA, , count] = del;
       const currentDels = [];
@@ -138,38 +163,6 @@ export default function FlarePortal() {
     } catch (e) { console.error(e); }
   }, [getProvider]);
 
-  // Tự động nhận diện ví nếu đã connect từ trước (Dành cho Mobile MetaMask Explorer)
-  useEffect(() => {
-    const checkPersistent = async () => {
-      if (window.ethereum) {
-        const accounts = await window.ethereum.request({ method: "eth_accounts" });
-        if (accounts.length > 0) connect();
-      }
-    };
-    checkPersistent();
-  }, []);
-
-  const connect = async () => {
-    if (!window.ethereum) return alert("Vui lòng mở trong trình duyệt MetaMask!");
-    try {
-      setStatus("⏳ Đang kết nối...");
-      const accs = await window.ethereum.request({ method: "eth_requestAccounts" });
-      if (accs.length > 0) {
-        const provider = new ethers.BrowserProvider(window.ethereum);
-        const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, ["function accountToDelegationAccount(address) view returns (address)"], provider);
-        const pda = await csm.accountToDelegationAccount(accs[0]);
-        
-        setAccount(accs[0]);
-        setPdaAddress(pda);
-        await refreshData(accs[0], pda);
-        setStatus("✅ Đã kết nối");
-      }
-    } catch (e) {
-      console.error(e);
-      setStatus("❌ Kết nối thất bại");
-    }
-  };
-
   const execute = async (label, action) => {
     try {
       setStatus(`⏳ ${label}...`);
@@ -180,12 +173,20 @@ export default function FlarePortal() {
         setWalletAmount(""); setPdaAmount(""); setPendingProvider(null); setProviderSearch("");
         setTimeout(() => refreshData(account, pdaAddress), 1500);
       }
-    } catch (e) {
-      setStatus(`❌ Lỗi: ${e.reason || "Giao dịch thất bại"}`);
+    } catch (e) { 
+        setStatus(`❌ Lỗi: ${e.reason || "Giao dịch thất bại"}`); 
     }
   };
 
-  // --- ACTIONS ---
+  const connect = async () => {
+    if (!window.ethereum) return alert("Cài MetaMask!");
+    const accs = await window.ethereum.request({ method: "eth_requestAccounts" });
+    const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, ["function accountToDelegationAccount(address) view returns (address)"], getProvider());
+    const pda = await csm.accountToDelegationAccount(accs[0]);
+    setAccount(accs[0]); setPdaAddress(pda);
+    refreshData(accs[0], pda);
+  };
+
   const handleWithdrawPDA = () => execute("Rút PDA", async () => {
     const s = await (getProvider()).getSigner();
     const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, ["function withdraw(uint256) external"], s);
@@ -196,7 +197,15 @@ export default function FlarePortal() {
     const s = await (getProvider()).getSigner();
     const r = new ethers.Contract(REWARD_MANAGER, ["function claim(address,address,uint24,bool,tuple(bytes32[],tuple(uint24,bytes20,uint120,uint8))[])", "function getRewardEpochIdsWithClaimableRewards() view returns (uint24,uint24)"], s);
     const [, end] = await r.getRewardEpochIdsWithClaimableRewards();
-    return r.claim(pdaAddress, pdaAddress, end, true, []);
+    const tx = await r.claim(pdaAddress, pdaAddress, end, true, []);
+    
+    // RESET ĐỒNG HỒ 3.5 NGÀY
+    const duration = 3.5 * 24 * 60 * 60 * 1000;
+    const endTime = Date.now() + duration;
+    localStorage.setItem("claim_countdown_end", endTime.toString());
+    setTimeLeft(Math.floor(duration / 1000));
+    
+    return tx;
   });
 
   const handleWrap = (isWrap) => execute(isWrap ? "Wrap" : "Unwrap", async () => {
@@ -218,15 +227,15 @@ export default function FlarePortal() {
     return w.delegate(target, pct * 100);
   });
 
-  const filteredProviders = useMemo(() =>
-    PROVIDERS.filter(p => p.name.toLowerCase().includes(providerSearch.toLowerCase())),
+  const filteredProviders = useMemo(() => 
+    PROVIDERS.filter(p => p.name.toLowerCase().includes(providerSearch.toLowerCase())), 
   [providerSearch]);
 
   const styles = {
-    container: { boxSizing: 'border-box', padding: "24px", maxWidth: "420px", margin: "10px auto", background: COLORS.DARK, color: "white", borderRadius: "32px", border: `1px solid ${COLORS.BORDER}`, fontFamily: "sans-serif", overflow: "hidden" },
+    container: { boxSizing: 'border-box', padding: "24px", maxWidth: "420px", margin: "20px auto", background: COLORS.DARK, color: "white", borderRadius: "32px", border: `1px solid ${COLORS.BORDER}`, fontFamily: "sans-serif", overflow: "hidden" },
     card: { boxSizing: 'border-box', background: COLORS.SURFACE, padding: "20px", borderRadius: "24px", marginBottom: "16px", border: "1px solid #1f1f1f" },
     label: { fontSize: "11px", color: COLORS.TEXT_MUTE, fontWeight: "800", letterSpacing: "1px", marginBottom: "12px", textTransform: "uppercase" },
-    input: { flex: 1, padding: "12px", borderRadius: "14px", background: "#080808", color: "white", border: "1px solid #222", outline: "none", fontSize: "14px" },
+    input: { flex: 1, padding: "12px", borderRadius: "14px", background: "#080808", color: "white", border: "1px solid #222", outline: "none" },
     btn: { padding: "12px", borderRadius: "14px", border: "none", cursor: "pointer", fontWeight: "bold", fontSize: "12px" },
     tickerWrap: { width: 'calc(100% + 48px)', overflow: 'hidden', background: '#0a0a0a', borderTop: `1px solid ${COLORS.BORDER}`, borderBottom: `1px solid ${COLORS.BORDER}`, padding: '12px 0', margin: '15px -24px 25px -24px' },
     ticker: { display: 'inline-block', whiteSpace: 'nowrap', animation: 'marquee 50s linear infinite', paddingLeft: '100%' },
@@ -237,13 +246,11 @@ export default function FlarePortal() {
   return (
     <div style={styles.container}>
       <style>{`@keyframes marquee { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }`}</style>
-
-      {/* 1. HEADER */}
+      
       <header style={{textAlign:'center', marginBottom:'10px', marginTop: '5px'}}>
         <h2 style={{color: COLORS.PINK, letterSpacing: '3px', margin: 0}}>OZPRO FLARE <span style={{fontWeight:300, color:'#fff'}}>MANAGER </span></h2>
       </header>
 
-      {/* 2. PRICE TICKER (Dưới tiêu đề) */}
       <div style={styles.tickerWrap}>
         <div style={styles.ticker}>
           <span style={{...styles.assetName, color: '#F7931A'}}>BTC</span><span style={styles.assetPrice}>${prices.btc.toLocaleString()}</span>
@@ -255,83 +262,104 @@ export default function FlarePortal() {
           <span style={{...styles.assetName, color: '#C2A633'}}>DOGE</span><span style={styles.assetPrice}>${prices.doge}</span>
         </div>
       </div>
-
+      
       {!account ? (
-        <button onClick={connect} style={{...styles.btn, width:'100%', background: COLORS.PINK, color:'white', padding:'18px', fontSize: '16px'}}>KẾT NỐI VÍ METAMASK</button>
+        <button onClick={connect} style={{...styles.btn, width:'100%', background: COLORS.PINK, color:'white', padding:'18px'}}>KẾT NỐI VÍ METAMASK</button>
       ) : (
         <>
-          {/* MAIN WALLET */}
+          {/* VÍ CHÍNH */}
           <section style={{...styles.card, border: `2px solid ${COLORS.PINK}44`}}>
             <div style={{...styles.label, color: COLORS.PINK}}>MAIN WALLET</div>
             <div style={{display:'flex', justifyContent:'space-between', marginBottom:15}}>
-              <div><div style={{fontSize:22, fontWeight:'900'}}>{Number(balances.flr).toFixed(2)} <small style={{fontSize:16, color:COLORS.PINK}}>FLR</small></div><div style={{fontSize:11, color:COLORS.TEXT_MUTE}}>{toUSD(balances.flr)}</div></div>
-              <div style={{textAlign: 'right'}}><div style={{fontSize:22, fontWeight:'900'}}>{Number(balances.wflr).toLocaleString()} <small style={{fontSize:16, color:COLORS.PINK}}>WFLR</small></div><div style={{fontSize:11, color:COLORS.TEXT_MUTE}}>{toUSD(balances.wflr)}</div></div>
+                <div><div style={{fontSize:24, fontWeight:'900'}}>{Number(balances.flr).toFixed(2)} <small style={{fontSize:18, color:COLORS.PINK}}>FLR</small></div><div style={{fontSize:12, color:COLORS.TEXT_MUTE}}>{toUSD(balances.flr)}</div></div>
+                <div style={{textAlign: 'right'}}><div style={{fontSize:24, fontWeight:'900'}}>{Number(balances.wflr).toLocaleString()} <small style={{fontSize:18, color:COLORS.PINK}}>WFLR</small></div><div style={{fontSize:12, color:COLORS.TEXT_MUTE}}>{toUSD(balances.wflr)}</div></div>
             </div>
             <div style={{display:'flex', gap:8, marginBottom:12}}>
-              <input type="number" value={walletAmount} onChange={(e)=>setWalletAmount(e.target.value)} style={styles.input} placeholder="Số FLR/WFLR..."/>
-              <button onClick={()=>setWalletAmount(balances.flr)} style={{...styles.btn, background: COLORS.PINK, color:'white'}}>MAX</button>
+                <input type="number" value={walletAmount} onChange={(e)=>setWalletAmount(e.target.value)} style={styles.input} placeholder="Nhập số FLR/WFLR vào đây trước..."/>
+                <button onClick={()=>setWalletAmount(balances.flr)} style={{...styles.btn, background: COLORS.PINK, color:'white'}}>MAX</button>
             </div>
             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1.2fr', gap:8}}>
-              <button onClick={()=>handleWrap(true)} style={{...styles.btn, background: COLORS.PINK, color:'white'}}>WRAP</button>
-              <button onClick={()=>handleWrap(false)} style={{...styles.btn, background: COLORS.PINK, color:'white'}}>UNWRAP</button>
-              <button onClick={handleToPDA} style={{...styles.btn, background: COLORS.PINK, color:'yellow'}}>NẠP PDA</button>
+                <button onClick={()=>handleWrap(true)} style={{...styles.btn, background: COLORS.PINK, color:'white'}}>WRAP</button>
+                <button onClick={()=>handleWrap(false)} style={{...styles.btn, background: COLORS.PINK, color:'white'}}>UNWRAP</button>
+                <button onClick={handleToPDA} style={{...styles.btn, background: COLORS.PINK, color:'yellow'}}>NẠP PDA</button>
             </div>
           </section>
 
-          {/* PDA ACCOUNT */}
+          {/* VÍ PDA */}
           <section style={{...styles.card, border: `2px solid ${COLORS.AMBER}44`}}>
             <div style={{...styles.label, color: COLORS.AMBER}}>DELEGATION ACCOUNT (PDA)</div>
-            <div style={{marginBottom: 15}}><div style={{fontSize:22, fontWeight:'900'}}>{Number(balances.pdaWflr).toLocaleString()} <small style={{color:COLORS.AMBER, fontSize:16}}>WFLR</small></div><div style={{fontSize:11, color:COLORS.TEXT_MUTE}}>{toUSD(balances.pdaWflr)}</div></div>
+            <div style={{marginBottom: 15}}><div style={{fontSize:24, fontWeight:'900'}}>{Number(balances.pdaWflr).toLocaleString()} <small style={{color:COLORS.AMBER, fontSize:18}}>WFLR</small></div><div style={{fontSize:12, color:COLORS.TEXT_MUTE}}>{toUSD(balances.pdaWflr)}</div></div>
             <div style={{display:'flex', gap:8, marginBottom:12}}>
-              <input type="number" value={pdaAmount} onChange={(e)=>setPdaAmount(e.target.value)} style={styles.input} placeholder="Số WFLR rút..."/>
-              <button onClick={()=>setPdaAmount(balances.pdaWflr)} style={{...styles.btn, background: COLORS.AMBER, color:'black'}}>MAX</button>
+                <input type="number" value={pdaAmount} onChange={(e)=>setPdaAmount(e.target.value)} style={styles.input} placeholder="Nhập số lượng WFLR cần rút trước..."/>
+                <button onClick={()=>setPdaAmount(balances.pdaWflr)} style={{...styles.btn, background: COLORS.AMBER, color:'black'}}>MAX</button>
             </div>
-            <button onClick={handleWithdrawPDA} style={{...styles.btn, width:'100%', background:'transparent', color: COLORS.PINK, border: `3px solid ${COLORS.AMBER}66`, marginBottom:20}}>⤺ RÚT VỀ MAIN WALLET</button>
+            <button onClick={handleWithdrawPDA} style={{...styles.btn, width:'100%', background: COLORS.AMBER, color: COLORS.PINK, border: `3px solid ${COLORS.AMBER}66`, marginBottom:20}}>⤺ RÚT WFLR VỀ MAIN WALLET</button>
+            
+            {/* CLAIM ZONE */}
             <div style={{background:'rgba(0,0,0,0.4)', padding:16, borderRadius:20, display:'flex', justifyContent:'space-between', alignItems:'center', border:'1px solid #222'}}>
-              <div><div style={{fontSize:11, color: COLORS.PRICE_GREEN}}>UNCLAIMED REWARDS</div><div style={{color: COLORS.AMBER, fontSize:18, fontWeight:'900'}}>+{Number(balances.reward).toFixed(2)} FLR</div></div>
-              <button onClick={handleClaim} disabled={Number(balances.reward) <= 0} style={{...styles.btn, background: Number(balances.reward) > 0 ? COLORS.AMBER : '#222', color:'white', padding:'10px 15px'}}>CLAIM</button>
+                <div>
+                  <div style={{fontSize:14, color: timeLeft > 0 ? COLORS.PINK : COLORS.PRICE_GREEN}}>
+                    {timeLeft > 0 ? "NEXT CYCLE IN" : "UNCLAIMED REWARDS"}
+                  </div>
+                  <div style={{color: timeLeft > 0 ? "#fff" : COLORS.AMBER, fontSize:24, fontWeight:'900'}}>
+                    {timeLeft > 0 ? formatFullTime(timeLeft) : `+${Number(balances.reward).toFixed(2)} FLR`}
+                  </div>
+                </div>
+                <button 
+                  onClick={handleClaim} 
+                  disabled={Number(balances.reward) <= 0} 
+                  style={{
+                    ...styles.btn, 
+                    minWidth: '100px',
+                    background: timeLeft > 0 ? "#1a1a1a" : COLORS.AMBER, 
+                    color: timeLeft > 0 ? COLORS.PINK : 'black',
+                    border: timeLeft > 0 ? `1px solid ${COLORS.PINK}66` : 'none'
+                  }}
+                >
+                  {timeLeft > 0 ? "RESET CLM" : "CLAIM"}
+                </button>
             </div>
           </section>
 
-          {/* DELEGATION */}
+          {/* DELEGATION SEARCH & SELECTION */}
           <section style={{...styles.card, border: `2px solid ${COLORS.PINK}44`}}>
             <div style={styles.label}>Delegations ({delegations.length}/2)</div>
             {delegations.map((d, i) => (
-              <div key={i} style={{display:'flex', justifyContent:'space-between', padding:'10px 0', borderBottom:'1px solid #222'}}>
-                <div><div style={{fontWeight:'bold', fontSize: '14px'}}>{d.name}</div><div style={{fontSize:11, color: COLORS.PINK}}>{d.pct}% Power</div></div>
+              <div key={i} style={{display:'flex', justifyContent:'space-between', padding:'12px 0', borderBottom:'1px solid #222'}}>
+                <div><div style={{fontWeight:'bold'}}>{d.name}</div><div style={{fontSize:11, color: COLORS.PINK}}>{d.pct}% Power</div></div>
                 <button onClick={()=>handleDelegate(d.addr, 0)} style={{background:'#ff444411', border:'none', color:'#ff4444', padding:'5px 10px', borderRadius:8}}>✕</button>
               </div>
             ))}
             
             <div ref={dropdownRef} style={{position:'relative', marginTop:12}}>
-              <div style={{position:'relative', display:'flex', alignItems:'center'}}>
-                <span style={{position:'absolute', left:12, color: COLORS.TEXT_MUTE}}>🔍</span>
-                <input 
-                  type="text" placeholder="Tìm Provider..." value={providerSearch} 
-                  onFocus={()=>setShowDropdown(true)} onChange={(e)=>setProviderSearch(e.target.value)} 
-                  style={{...styles.input, paddingLeft: 35, width: '100%', boxSizing:'border-box'}}
-                />
-              </div>
-
-              {showDropdown && (
-                <div style={{position:'absolute', bottom:'110%', left:0, right:0, background:'#181818', borderRadius:15, border:'1px solid #333', maxHeight:150, overflowY:'auto', zIndex:100, boxShadow: '0 -10px 20px rgba(0,0,0,0.5)'}}>
-                  {filteredProviders.map(p => (
-                    <div key={p.address} onClick={()=>{ setPendingProvider(p); setProviderSearch(p.name); setShowDropdown(false); }} style={{padding:12, fontSize:13, borderBottom:'1px solid #222', cursor:'pointer'}}>{p.name} <span style={{color: COLORS.PINK, float:'right'}}>50%</span></div>
-                  ))}
+                <div style={{position:'relative', display:'flex', alignItems:'center'}}>
+                  <span style={{position:'absolute', left:12, color: COLORS.TEXT_MUTE}}>🔍</span>
+                  <input 
+                    type="text" placeholder="Tìm Provider..." value={providerSearch} 
+                    onFocus={()=>setShowDropdown(true)} onChange={(e)=>setProviderSearch(e.target.value)} 
+                    style={{...styles.input, paddingLeft: 35, width: '100%', boxSizing:'border-box'}}
+                  />
                 </div>
-              )}
 
-              {pendingProvider && (
-                <div style={{marginTop: 12, padding: 12, background: 'rgba(227, 24, 100, 0.1)', borderRadius: 16, border: `1px dashed ${COLORS.PINK}`, textAlign:'center'}}>
-                  <div style={{fontSize:12, marginBottom:8}}>Ủy quyền cho <b>{pendingProvider.name}</b>?</div>
-                  <button onClick={() => handleDelegate(pendingProvider.address, 50)} style={{...styles.btn, background: COLORS.PINK, color:'white', width: '100%', padding: '10px'}}>KÝ XÁC NHẬN (50%)</button>
-                  <div onClick={() => { setPendingProvider(null); setProviderSearch(""); }} style={{fontSize:10, marginTop:8, color: COLORS.TEXT_MUTE, cursor:'pointer', textDecoration:'underline'}}>Hủy chọn</div>
-                </div>
-              )}
+                {showDropdown && (
+                    <div style={{position:'absolute', bottom:'110%', left:0, right:0, background:'#181818', borderRadius:15, border:'1px solid #333', maxHeight:150, overflowY:'auto', zIndex:100, boxShadow: '0 -10px 20px rgba(0,0,0,0.5)'}}>
+                        {filteredProviders.map(p => (
+                            <div key={p.address} onClick={()=>{ setPendingProvider(p); setProviderSearch(p.name); setShowDropdown(false); }} style={{padding:12, fontSize:13, borderBottom:'1px solid #222', cursor:'pointer'}}>{p.name} <span style={{color: COLORS.PINK, float:'right'}}>50%</span></div>
+                        ))}
+                    </div>
+                )}
+
+                {pendingProvider && (
+                  <div style={{marginTop: 12, padding: 12, background: 'rgba(227, 24, 100, 0.1)', borderRadius: 16, border: `1px dashed ${COLORS.PINK}`, textAlign:'center'}}>
+                    <div style={{fontSize:12, marginBottom:8}}>Ủy quyền cho <b>{pendingProvider.name}</b>?</div>
+                    <button onClick={() => handleDelegate(pendingProvider.address, 50)} style={{...styles.btn, background: COLORS.PINK, color:'white', width: '100%', padding: '10px'}}>KÝ XÁC NHẬN (50%)</button>
+                    <div onClick={() => { setPendingProvider(null); setProviderSearch(""); }} style={{fontSize:10, marginTop:8, color: COLORS.TEXT_MUTE, cursor:'pointer', textDecoration:'underline'}}>Hủy chọn</div>
+                  </div>
+                )}
             </div>
           </section>
 
-          <div style={{textAlign:'center', fontSize:11, color: COLORS.PINK, fontWeight:'bold', paddingBottom: '10px'}}>● {status.toUpperCase()}</div>
+          <div style={{textAlign:'center', fontSize:11, color: COLORS.PINK, fontWeight:'bold'}}>● {status.toUpperCase()}</div>
         </>
       )}
     </div>
