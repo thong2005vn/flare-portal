@@ -354,7 +354,7 @@ export default function FlarePortal() {
           <section style={{ ...styles.card, border: `2px solid ${COLORS.PINK}44` }}>
             <div style={{ ...styles.label, color: COLORS.PINK }}>MAIN WALLET</div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 15 }}>
-              <div><div style={{ fontSize: 24, fontWeight: '900' }}>{Number(balances.flr).toFixed(2)} <small style={{ fontSize: 18, color: COLORS.PINK }}> FLR</small></div><div style={{ fontSize: 12, color: COLORS.TEXT_MUTE }}>{toUSD(balances.flr)}</div></div>
+              <div><div style={{ fontSize: 24, fontWeight: '900' }}>{Number(balances.flr).toLocaleString()} <small style={{ fontSize: 18, color: COLORS.PINK }}> FLR</small></div><div style={{ fontSize: 12, color: COLORS.TEXT_MUTE }}>{toUSD(balances.flr)}</div></div>
               <div style={{ textAlign: 'right' }}><div style={{ fontSize: 24, fontWeight: '900' }}>{Number(balances.wflr).toLocaleString()} <small style={{ fontSize: 18, color: COLORS.PINK }}> WFLR</small></div><div style={{ fontSize: 12, color: COLORS.TEXT_MUTE }}>{toUSD(balances.wflr)}</div></div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
