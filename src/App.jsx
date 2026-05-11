@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { ethers } from "ethers";
+import { QRCodeSVG } from "qrcode.react";
 
 // --- CẤU HÌNH HỆ THỐNG FLARE ---
 const WNAT = "0x1D80c49BbBCd1C0911346656B529DF9E5c2F783d";
@@ -62,8 +63,10 @@ export default function FlarePortal() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [pendingProvider, setPendingProvider] = useState(null);
   const [prices, setPrices] = useState({ btc: 0, eth: 0, xrp: 0, flr: 0, sgb: 0, ltc: 0, doge: 0 });
+  const [showQR, setShowQR] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  // --- LOGIC ĐẾM NGƯỢC KHOA HỌC ---
+  // --- LOGIC ĐẾM NGƯỢC ---
   const [timeLeft, setTimeLeft] = useState(0);
   const CYCLE_SECONDS = 3.5 * 24 * 3600;
 
@@ -197,6 +200,12 @@ export default function FlarePortal() {
     refreshData(accs[0], pda);
   };
 
+  const handleCopy = () => {
+    navigator.clipboard.writeText(account);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const handleWithdrawPDA = () => execute("Rút PDA", async () => {
     const s = await (getProvider()).getSigner();
     const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, ["function withdraw(uint256) external"], s);
@@ -241,7 +250,7 @@ export default function FlarePortal() {
     [providerSearch]);
 
   const styles = {
-    container: { boxSizing: 'border-box', padding: "24px", maxWidth: "420px", margin: "20px auto", background: COLORS.DARK, color: "white", borderRadius: "32px", border: `1px solid ${COLORS.BORDER}`, fontFamily: "sans-serif", overflow: "hidden" },
+    container: { boxSizing: 'border-box', padding: "24px", maxWidth: "420px", margin: "20px auto", background: COLORS.DARK, color: "white", borderRadius: "32px", border: `1px solid ${COLORS.BORDER}`, fontFamily: "sans-serif", position: 'relative', overflow: "hidden" },
     card: { boxSizing: 'border-box', background: COLORS.SURFACE, padding: "20px", borderRadius: "24px", marginBottom: "16px", border: "1px solid #1f1f1f" },
     label: { fontSize: "11px", color: COLORS.TEXT_MUTE, fontWeight: "800", letterSpacing: "1px", marginBottom: "12px", textTransform: "uppercase" },
     input: { flex: 1, padding: "12px", borderRadius: "14px", background: "#080808", color: "white", border: "1px solid #222", outline: "none" },
@@ -249,17 +258,60 @@ export default function FlarePortal() {
     tickerWrap: { width: 'calc(100% + 48px)', overflow: 'hidden', background: '#0a0a0a', borderTop: `1px solid ${COLORS.BORDER}`, borderBottom: `1px solid ${COLORS.BORDER}`, padding: '12px 0', margin: '15px -24px 25px -24px' },
     ticker: { display: 'inline-block', whiteSpace: 'nowrap', animation: 'marquee 50s linear infinite', paddingLeft: '100%' },
     assetName: { fontWeight: '800', marginRight: '6px' },
-    assetPrice: { color: COLORS.PRICE_GREEN, marginRight: '35px', fontFamily: 'monospace', fontSize: '14px' }
+    assetPrice: { color: COLORS.PRICE_GREEN, marginRight: '35px', fontFamily: 'monospace', fontSize: '14px' },
+    // Pop-up QR Styles
+    qrOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '24px' },
+    qrContainer: { background: 'white', padding: '15px', borderRadius: '24px', marginBottom: '20px', boxShadow: `0 0 30px ${COLORS.PINK}44` },
+    copyBadge: { background: '#161616', padding: '12px 18px', borderRadius: '16px', border: `1px solid ${COLORS.BORDER}`, display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', maxWidth: '100%' }
   };
 
   return (
     <div style={styles.container}>
       <style>{`@keyframes marquee { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }`}</style>
 
+      {/* Pop-up QR Code & Copy */}
+      {showQR && (
+        <div style={styles.qrOverlay} onClick={() => setShowQR(false)}>
+           <div style={styles.qrContainer} onClick={(e) => e.stopPropagation()}>
+              <QRCodeSVG value={account} size={220} />
+           </div>
+           
+           <div 
+              style={styles.copyBadge} 
+              onClick={(e) => { e.stopPropagation(); handleCopy(); }}
+            >
+              <span style={{ color: copied ? COLORS.PRICE_GREEN : COLORS.PINK, fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {account}
+              </span>
+              <span style={{ fontSize: '14px' }}>{copied ? "✅" : "📋"}</span>
+           </div>
+           <div style={{ fontSize: '10px', color: COLORS.TEXT_MUTE, marginTop: '8px', marginBottom: '25px' }}>
+              {copied ? "Address copied to clipboard!" : "Click the address to copy"}
+           </div>
+
+           <button onClick={() => setShowQR(false)} style={{ ...styles.btn, background: COLORS.PINK, color: 'white', padding: '12px 40px', borderRadius: '20px' }}>CLOSE</button>
+        </div>
+      )}
+
       <header style={{ textAlign: 'center', marginBottom: '10px', marginTop: '5px' }}>
         <h2 style={{ color: COLORS.PINK, letterSpacing: '3px', margin: 0 }}>OZPRO FLARE <span style={{ fontWeight: 300, color: '#fff' }}>MANAGER </span></h2>
+        
+        {account && (
+          <div 
+            onClick={() => setShowQR(true)}
+            style={{ 
+              display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#161616', 
+              padding: '6px 14px', borderRadius: '20px', border: `1px solid ${COLORS.BORDER}`, 
+              marginTop: '12px', cursor: 'pointer', transition: '0.2s' 
+            }}
+          >
+            <span style={{ fontSize: '12px', color: COLORS.PINK, fontWeight: 'bold' }}>{account.slice(0, 6)}...{account.slice(-4)}</span>
+            <span style={{ fontSize: '14px' }}>🔍</span>
+          </div>
+        )}
       </header>
 
+      {/* GIỮ NGUYÊN PHẦN TICKER GIÁ */}
       <div style={styles.tickerWrap}>
         <div style={styles.ticker}>
           <span style={{ ...styles.assetName, color: '#F7931A' }}>BTC</span><span style={styles.assetPrice}>${prices.btc.toLocaleString()}</span>
@@ -276,7 +328,7 @@ export default function FlarePortal() {
         <button onClick={connect} style={{ ...styles.btn, width: '100%', background: COLORS.PINK, color: 'white', padding: '18px' }}>KẾT NỐI VÍ METAMASK</button>
       ) : (
         <>
-          {/* VÍ CHÍNH */}
+          {/* VÍ CHÍNH - GIỮ NGUYÊN */}
           <section style={{ ...styles.card, border: `2px solid ${COLORS.PINK}44` }}>
             <div style={{ ...styles.label, color: COLORS.PINK }}>MAIN WALLET</div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 15 }}>
@@ -294,7 +346,7 @@ export default function FlarePortal() {
             </div>
           </section>
 
-          {/* VÍ PDA & CLAIM REDESIGNED */}
+          {/* VÍ PDA & CLAIM - GIỮ NGUYÊN */}
           <section style={{ ...styles.card, border: `2px solid ${COLORS.AMBER}44` }}>
             <div style={{ ...styles.label, color: COLORS.AMBER }}>DELEGATION ACCOUNT (PDA)</div>
             <div style={{ marginBottom: 15 }}><div style={{ fontSize: 24, fontWeight: '900' }}>{Number(balances.pdaWflr).toLocaleString()} <small style={{ color: COLORS.AMBER, fontSize: 18 }}>WFLR</small></div><div style={{ fontSize: 12, color: COLORS.TEXT_MUTE }}>{toUSD(balances.pdaWflr)}</div></div>
@@ -304,7 +356,6 @@ export default function FlarePortal() {
             </div>
             <button onClick={handleWithdrawPDA} style={{ ...styles.btn, width: '100%', background: COLORS.AMBER, color: COLORS.PINK, border: `3px solid ${COLORS.AMBER}66`, marginBottom: 20 }}>⤺ RÚT WFLR VỀ MAIN WALLET</button>
 
-            {/* KHOA HỌC COUNTDOWN SECTION */}
             <div style={{
               background: 'rgba(0,0,0,0.5)',
               padding: '16px',
@@ -334,7 +385,6 @@ export default function FlarePortal() {
                   {timeLeft > 0 ? "LOCKED" : "CLAIM"}
                 </button>
               </div>
-              {/* PROGRESS BAR */}
               <div style={{ width: '100%', height: '4px', background: '#222', borderRadius: '10px', marginTop: '12px', overflow: 'hidden' }}>
                 <div style={{
                   width: `${Math.max(0, 100 - (timeLeft / CYCLE_SECONDS * 100))}%`,
@@ -346,7 +396,7 @@ export default function FlarePortal() {
             </div>
           </section>
 
-          {/* DELEGATION SEARCH */}
+          {/* DELEGATION SEARCH - GIỮ NGUYÊN */}
           <section style={{ ...styles.card, border: `2px solid ${COLORS.PINK}44` }}>
             <div style={styles.label}>Delegations ({delegations.length}/2)</div>
             {delegations.map((d, i) => (
