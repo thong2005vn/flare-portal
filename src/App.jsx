@@ -67,6 +67,15 @@ export default function FlarePortal() {
   const [showQR, setShowQR] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // --- THỰC HIỆN ĐỔI MÀU NỀN NGOÀI APP ---
+  useEffect(() => {
+    document.body.style.backgroundColor = "#080808"; 
+    document.body.style.margin = "0";
+    return () => {
+      document.body.style.backgroundColor = ""; 
+    };
+  }, []);
+
   // --- LOGIC ĐẾM NGƯỢC ---
   const [timeLeft, setTimeLeft] = useState(0);
   const CYCLE_SECONDS = 3.5 * 24 * 3600;
