@@ -54,6 +54,7 @@ const PROVIDERS = [
 export default function FlarePortal() {
   const [account, setAccount] = useState("");
   const [pdaAddress, setPdaAddress] = useState("");
+  const [isActivated, setIsActivated] = useState(false);
   const [balances, setBalances] = useState({ flr: "0", wflr: "0", pdaWflr: "0", reward: "0" });
   const [delegations, setDelegations] = useState([]);
   const [walletAmount, setWalletAmount] = useState("");
@@ -145,6 +146,16 @@ export default function FlarePortal() {
     if (!addr || !pda) return;
     try {
       const p = getProvider();
+
+      // Kiểm tra trạng thái PDA qua owner
+      try {
+        const pdaContract = new ethers.Contract(pda, ["function owner() view returns (address)"], p);
+        const pdaOwner = await pdaContract.owner();
+        setIsActivated(pdaOwner.toLowerCase() === addr.toLowerCase());
+      } catch (e) {
+        setIsActivated(false);
+      }
+
       const wnat = new ethers.Contract(WNAT, ["function balanceOf(address) view returns (uint256)", "function delegatesOf(address) view returns (address[], uint256[], uint256, uint256)"], p);
       const rew = new ethers.Contract(REWARD_MANAGER, ["function getStateOfRewards(address) view returns (tuple(uint24, bytes20, uint120, uint8, bool)[][])"], p);
 
@@ -206,6 +217,12 @@ export default function FlarePortal() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleEnablePDA = () => execute("Kích hoạt PDA", async () => {
+    const s = await (getProvider()).getSigner();
+    const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, ["function enableDelegationAccount() external returns (address)"], s);
+    return csm.enableDelegationAccount();
+  });
+
   const handleWithdrawPDA = () => execute("Rút PDA", async () => {
     const s = await (getProvider()).getSigner();
     const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, ["function withdraw(uint256) external"], s);
@@ -259,7 +276,6 @@ export default function FlarePortal() {
     ticker: { display: 'inline-block', whiteSpace: 'nowrap', animation: 'marquee 50s linear infinite', paddingLeft: '100%' },
     assetName: { fontWeight: '800', marginRight: '6px' },
     assetPrice: { color: COLORS.PRICE_GREEN, marginRight: '35px', fontFamily: 'monospace', fontSize: '14px' },
-    // Pop-up QR Styles
     qrOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '24px' },
     qrContainer: { background: 'white', padding: '15px', borderRadius: '24px', marginBottom: '20px', boxShadow: `0 0 30px ${COLORS.PINK}44` },
     copyBadge: { background: '#161616', padding: '12px 18px', borderRadius: '16px', border: `1px solid ${COLORS.BORDER}`, display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', maxWidth: '100%' }
@@ -269,7 +285,6 @@ export default function FlarePortal() {
     <div style={styles.container}>
       <style>{`@keyframes marquee { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }`}</style>
 
-      {/* Pop-up QR Code & Copy */}
       {showQR && (
         <div style={styles.qrOverlay} onClick={() => setShowQR(false)}>
            <div style={styles.qrContainer} onClick={(e) => e.stopPropagation()}>
@@ -311,7 +326,6 @@ export default function FlarePortal() {
         )}
       </header>
 
-      {/* GIỮ NGUYÊN PHẦN TICKER GIÁ */}
       <div style={styles.tickerWrap}>
         <div style={styles.ticker}>
           <span style={{ ...styles.assetName, color: '#F7931A' }}>BTC</span><span style={styles.assetPrice}>${prices.btc.toLocaleString()}</span>
@@ -328,7 +342,6 @@ export default function FlarePortal() {
         <button onClick={connect} style={{ ...styles.btn, width: '100%', background: COLORS.PINK, color: 'white', padding: '18px' }}>KẾT NỐI VÍ METAMASK</button>
       ) : (
         <>
-          {/* VÍ CHÍNH - GIỮ NGUYÊN */}
           <section style={{ ...styles.card, border: `2px solid ${COLORS.PINK}44` }}>
             <div style={{ ...styles.label, color: COLORS.PINK }}>MAIN WALLET</div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 15 }}>
@@ -346,57 +359,65 @@ export default function FlarePortal() {
             </div>
           </section>
 
-          {/* VÍ PDA & CLAIM - GIỮ NGUYÊN */}
           <section style={{ ...styles.card, border: `2px solid ${COLORS.AMBER}44` }}>
             <div style={{ ...styles.label, color: COLORS.AMBER }}>DELEGATION ACCOUNT (PDA)</div>
-            <div style={{ marginBottom: 15 }}><div style={{ fontSize: 24, fontWeight: '900' }}>{Number(balances.pdaWflr).toLocaleString()} <small style={{ color: COLORS.AMBER, fontSize: 18 }}>WFLR</small></div><div style={{ fontSize: 12, color: COLORS.TEXT_MUTE }}>{toUSD(balances.pdaWflr)}</div></div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-              <input type="number" value={pdaAmount} onChange={(e) => setPdaAmount(e.target.value)} style={styles.input} placeholder="Số lượng rút..." />
-              <button onClick={() => setPdaAmount(balances.pdaWflr)} style={{ ...styles.btn, background: COLORS.AMBER, color: 'black' }}>MAX</button>
-            </div>
-            <button onClick={handleWithdrawPDA} style={{ ...styles.btn, width: '100%', background: COLORS.AMBER, color: COLORS.PINK, border: `3px solid ${COLORS.AMBER}66`, marginBottom: 20 }}>⤺ RÚT WFLR VỀ MAIN WALLET</button>
+            
+            {(!isActivated && balances.pdaWflr === "0") ? (
+              <div style={{ textAlign: 'center', padding: '10px 0' }}>
+                <p style={{ fontSize: '11px', color: COLORS.TEXT_MUTE, marginBottom: '15px' }}>Tài khoản PDA chưa được kích hoạt.</p>
+                <button onClick={handleEnablePDA} style={{ ...styles.btn, width: '100%', background: COLORS.AMBER, color: 'black' }}>⚡ KÍCH HOẠT PDA</button>
+              </div>
+            ) : (
+              <>
+                <div style={{ marginBottom: 15 }}><div style={{ fontSize: 24, fontWeight: '900' }}>{Number(balances.pdaWflr).toLocaleString()} <small style={{ color: COLORS.AMBER, fontSize: 18 }}>WFLR</small></div><div style={{ fontSize: 12, color: COLORS.TEXT_MUTE }}>{toUSD(balances.pdaWflr)}</div></div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  <input type="number" value={pdaAmount} onChange={(e) => setPdaAmount(e.target.value)} style={styles.input} placeholder="Số lượng rút..." />
+                  <button onClick={() => setPdaAmount(balances.pdaWflr)} style={{ ...styles.btn, background: COLORS.AMBER, color: 'black' }}>MAX</button>
+                </div>
+                <button onClick={handleWithdrawPDA} style={{ ...styles.btn, width: '100%', background: COLORS.AMBER, color: COLORS.PINK, border: `3px solid ${COLORS.AMBER}66`, marginBottom: 20 }}>⤺ RÚT WFLR VỀ MAIN WALLET</button>
 
-            <div style={{
-              background: 'rgba(0,0,0,0.5)',
-              padding: '16px',
-              borderRadius: '20px',
-              border: `1px solid ${timeLeft > 0 ? COLORS.BORDER : COLORS.PINK + '44'}`,
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontSize: '10px', color: timeLeft > 0 ? COLORS.TEXT_MUTE : COLORS.PINK, fontWeight: '800', marginBottom: '4px' }}>
-                    {timeLeft > 0 ? "NEXT REWARD CYCLE" : "UNCLAIMED REWARDS"}
+                <div style={{
+                  background: 'rgba(0,0,0,0.5)',
+                  padding: '16px',
+                  borderRadius: '20px',
+                  border: `1px solid ${timeLeft > 0 ? COLORS.BORDER : COLORS.PINK + '44'}`,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: '10px', color: timeLeft > 0 ? COLORS.TEXT_MUTE : COLORS.PINK, fontWeight: '800', marginBottom: '4px' }}>
+                        {timeLeft > 0 ? "NEXT REWARD CYCLE" : "UNCLAIMED REWARDS"}
+                      </div>
+                      <div style={{ fontSize: '20px', fontWeight: '900' }}>
+                        {timeLeft > 0 ? renderCountdown(timeLeft) : <span style={{ color: COLORS.PRICE_GREEN }}>+{Number(balances.reward).toFixed(2)} FLR</span>}
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleClaim}
+                      disabled={Number(balances.reward) <= 0}
+                      style={{
+                        ...styles.btn,
+                        minWidth: '85px',
+                        background: timeLeft > 0 ? "transparent" : COLORS.AMBER,
+                        color: timeLeft > 0 ? COLORS.TEXT_MUTE : 'black',
+                        border: timeLeft > 0 ? `1px solid ${COLORS.BORDER}` : 'none'
+                      }}
+                    >
+                      {timeLeft > 0 ? "LOCKED" : "CLAIM"}
+                    </button>
                   </div>
-                  <div style={{ fontSize: '20px', fontWeight: '900' }}>
-                    {timeLeft > 0 ? renderCountdown(timeLeft) : <span style={{ color: COLORS.PRICE_GREEN }}>+{Number(balances.reward).toFixed(2)} FLR</span>}
+                  <div style={{ width: '100%', height: '4px', background: '#222', borderRadius: '10px', marginTop: '12px', overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${Math.max(0, 100 - (timeLeft / CYCLE_SECONDS * 100))}%`,
+                      height: '100%',
+                      background: timeLeft > 0 ? COLORS.PINK : COLORS.PRICE_GREEN,
+                      transition: 'width 1s linear'
+                    }} />
                   </div>
                 </div>
-                <button
-                  onClick={handleClaim}
-                  disabled={Number(balances.reward) <= 0}
-                  style={{
-                    ...styles.btn,
-                    minWidth: '85px',
-                    background: timeLeft > 0 ? "transparent" : COLORS.AMBER,
-                    color: timeLeft > 0 ? COLORS.TEXT_MUTE : 'black',
-                    border: timeLeft > 0 ? `1px solid ${COLORS.BORDER}` : 'none'
-                  }}
-                >
-                  {timeLeft > 0 ? "LOCKED" : "CLAIM"}
-                </button>
-              </div>
-              <div style={{ width: '100%', height: '4px', background: '#222', borderRadius: '10px', marginTop: '12px', overflow: 'hidden' }}>
-                <div style={{
-                  width: `${Math.max(0, 100 - (timeLeft / CYCLE_SECONDS * 100))}%`,
-                  height: '100%',
-                  background: timeLeft > 0 ? COLORS.PINK : COLORS.PRICE_GREEN,
-                  transition: 'width 1s linear'
-                }} />
-              </div>
-            </div>
+              </>
+            )}
           </section>
 
-          {/* DELEGATION SEARCH - GIỮ NGUYÊN */}
           <section style={{ ...styles.card, border: `2px solid ${COLORS.PINK}44` }}>
             <div style={styles.label}>Delegations ({delegations.length}/2)</div>
             {delegations.map((d, i) => (
