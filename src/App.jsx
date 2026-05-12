@@ -330,7 +330,7 @@ export default function FlarePortal() {
             }}
           >
             <span style={{ fontSize: '12px', color: COLORS.PINK, fontWeight: 'bold' }}>{account.slice(0, 6)}...{account.slice(-4)}</span>
-            <span style={{ fontSize: '14px' }}>🔍</span>
+            <span style={{ fontSize: '14px' }}> 📲⛆</span>
           </div>
         )}
       </header>
