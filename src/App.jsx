@@ -358,7 +358,7 @@ export default function FlarePortal() {
               <div style={{ textAlign: 'right' }}><div style={{ fontSize: 24, fontWeight: '900' }}>{Number(balances.wflr).toLocaleString()} <small style={{ fontSize: 18, color: COLORS.PINK }}> WFLR</small></div><div style={{ fontSize: 12, color: COLORS.TEXT_MUTE }}>{toUSD(balances.wflr)}</div></div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-              <input type="number" value={walletAmount} onChange={(e) => setWalletAmount(e.target.value)} style={styles.input} placeholder="𝟏𝟐𝟑𝟒𝟓𝟔𝟕𝟖𝟗𝟎 Số FLR/WFLR..." />
+              <input type="number" value={walletAmount} onChange={(e) => setWalletAmount(e.target.value)} style={styles.input} placeholder="Điền số FLR/WFLR vào đây trước..." />
               <button onClick={() => setWalletAmount(balances.flr)} style={{ ...styles.btn, background: COLORS.PINK, color: 'white' }}>MAX</button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: 8 }}>
@@ -380,7 +380,7 @@ export default function FlarePortal() {
               <>
                 <div style={{ marginBottom: 15 }}><div style={{ fontSize: 24, fontWeight: '900' }}>{Number(balances.pdaWflr).toLocaleString()} <small style={{ color: COLORS.AMBER, fontSize: 18 }}> WFLR</small></div><div style={{ fontSize: 12, color: COLORS.TEXT_MUTE }}>{toUSD(balances.pdaWflr)}</div></div>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                  <input type="number" value={pdaAmount} onChange={(e) => setPdaAmount(e.target.value)} style={styles.input} placeholder="𝟏𝟐𝟑𝟒𝟓𝟔𝟕𝟖𝟗𝟎 Số lượng rút..." />
+                  <input type="number" value={pdaAmount} onChange={(e) => setPdaAmount(e.target.value)} style={styles.input} placeholder="Điền số lượng rút vào đây trước..." />
                   <button onClick={() => setPdaAmount(balances.pdaWflr)} style={{ ...styles.btn, background: COLORS.AMBER, color: 'black' }}>MAX</button>
                 </div>
                 <button onClick={handleWithdrawPDA} style={{ ...styles.btn, width: '100%', background: COLORS.AMBER, color: COLORS.PINK, border: `3px solid ${COLORS.AMBER}66`, marginBottom: 20 }}>⤺ RÚT WFLR VỀ MAIN WALLET</button>
