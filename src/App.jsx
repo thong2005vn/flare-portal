@@ -7,6 +7,14 @@ const WNAT = "0x1D80c49BbBCd1C0911346656B529DF9E5c2F783d";
 const REWARD_MANAGER = "0xC8f55c5aA2C752eE285Bd872855C749f4ee6239B";
 const CLAIM_SETUP_MANAGER = "0xD56c0Ea37B848939B59e6F5Cda119b3fA473b5eB";
 
+const FLARE_PARAMS = {
+  chainId: "0xe", // 14
+  chainName: "Flare Mainnet",
+  nativeCurrency: { name: "Flare", symbol: "FLR", decimals: 18 },
+  rpcUrls: ["https://flare-api.flare.network/ext/C/rpc"],
+  blockExplorerUrls: ["https://flare-explorer.flare.network/"]
+};
+
 const COLORS = {
   PINK: "#e31864",
   AMBER: "#fbbf24",
@@ -66,6 +74,35 @@ export default function FlarePortal() {
   const [prices, setPrices] = useState({ btc: 0, eth: 0, xrp: 0, flr: 0, sgb: 0, ltc: 0, doge: 0 });
   const [showQR, setShowQR] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showNetworkModal, setShowNetworkModal] = useState(false);
+
+  // --- LOGIC KIỂM TRA MẠNG ---
+  const ensureFlareNetwork = async () => {
+    if (!window.ethereum) return false;
+    const chainId = await window.ethereum.request({ method: "eth_chainId" });
+    if (chainId !== FLARE_PARAMS.chainId) {
+      setShowNetworkModal(true);
+      return false;
+    }
+    return true;
+  };
+
+  const handleSwitchNetwork = async () => {
+    try {
+      await window.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: FLARE_PARAMS.chainId }],
+      });
+      setShowNetworkModal(false);
+    } catch (err) {
+      if (err.code === 4902) {
+        await window.ethereum.request({
+          method: "wallet_addEthereumChain",
+          params: [FLARE_PARAMS],
+        });
+      }
+    }
+  };
 
   // --- THỰC HIỆN ĐỔI MÀU NỀN NGOÀI APP ---
   useEffect(() => {
@@ -196,6 +233,10 @@ export default function FlarePortal() {
   }, [getProvider]);
 
   const execute = async (label, action) => {
+    // CHÈN KIỂM TRA MẠNG TRƯỚC KHI THỰC THI
+    const isOk = await ensureFlareNetwork();
+    if (!isOk) return;
+
     try {
       setStatus(`⏳ ${label}...`);
       const tx = await action();
@@ -213,6 +254,11 @@ export default function FlarePortal() {
 
   const connect = async () => {
     if (!window.ethereum) return alert("Cài MetaMask!");
+    
+    // CHÈN KIỂM TRA MẠNG KHI CONNECT
+    const isOk = await ensureFlareNetwork();
+    if (!isOk) return;
+
     const accs = await window.ethereum.request({ method: "eth_requestAccounts" });
     const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, ["function accountToDelegationAccount(address) view returns (address)"], getProvider());
     const pda = await csm.accountToDelegationAccount(accs[0]);
@@ -287,12 +333,25 @@ export default function FlarePortal() {
     assetPrice: { color: COLORS.PRICE_GREEN, marginRight: '35px', fontFamily: 'monospace', fontSize: '14px' },
     qrOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '24px' },
     qrContainer: { background: 'white', padding: '15px', borderRadius: '24px', marginBottom: '20px', boxShadow: `0 0 30px ${COLORS.PINK}44` },
-    copyBadge: { background: '#161616', padding: '12px 18px', borderRadius: '16px', border: `1px solid ${COLORS.BORDER}`, display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', maxWidth: '100%' }
+    copyBadge: { background: '#161616', padding: '12px 18px', borderRadius: '16px', border: `1px solid ${COLORS.BORDER}`, display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', maxWidth: '100%' },
+    networkModal: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '20px', textAlign: 'center' }
   };
 
   return (
     <div style={styles.container}>
       <style>{`@keyframes marquee { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }`}</style>
+
+      {/* POP-UP SAI MẠNG */}
+      {showNetworkModal && (
+        <div style={styles.networkModal}>
+          <div style={{ background: COLORS.SURFACE, border: `1px solid ${COLORS.PINK}`, padding: '30px', borderRadius: '24px', maxWidth: '300px' }}>
+            <div style={{ fontSize: '40px', marginBottom: '15px' }}>🌐</div>
+            <h3 style={{ margin: '0 0 10px 0' }}>SAI MẠNG KẾT NỐI</h3>
+            <p style={{ fontSize: '13px', color: COLORS.TEXT_MUTE, marginBottom: '20px' }}>Ứng dụng yêu cầu mạng <b>Flare Mainnet</b> để hoạt động.</p>
+            <button onClick={handleSwitchNetwork} style={{ ...styles.btn, background: COLORS.PINK, color: 'white', width: '100%', padding: '15px' }}>CHUYỂN SANG FLARE</button>
+          </div>
+        </div>
+      )}
 
       {showQR && (
         <div style={styles.qrOverlay} onClick={() => setShowQR(false)}>
