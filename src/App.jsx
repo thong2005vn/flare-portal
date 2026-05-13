@@ -233,7 +233,6 @@ export default function FlarePortal() {
   }, [getProvider]);
 
   const execute = async (label, action) => {
-    // CHÈN KIỂM TRA MẠNG TRƯỚC KHI THỰC THI
     const isOk = await ensureFlareNetwork();
     if (!isOk) return;
 
@@ -254,8 +253,6 @@ export default function FlarePortal() {
 
   const connect = async () => {
     if (!window.ethereum) return alert("Cài MetaMask!");
-    
-    // CHÈN KIỂM TRA MẠNG KHI CONNECT
     const isOk = await ensureFlareNetwork();
     if (!isOk) return;
 
@@ -266,8 +263,8 @@ export default function FlarePortal() {
     refreshData(accs[0], pda);
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(account);
+  const handleCopy = (text) => {
+    navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -334,14 +331,14 @@ export default function FlarePortal() {
     qrOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '24px' },
     qrContainer: { background: 'white', padding: '15px', borderRadius: '24px', marginBottom: '20px', boxShadow: `0 0 30px ${COLORS.PINK}44` },
     copyBadge: { background: '#161616', padding: '12px 18px', borderRadius: '16px', border: `1px solid ${COLORS.BORDER}`, display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', maxWidth: '100%' },
-    networkModal: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '20px', textAlign: 'center' }
+    networkModal: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '20px', textAlign: 'center' },
+    pdaBadge: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0a0a0a', color: COLORS.AMBER, padding: '8px 12px', borderRadius: '10px', fontSize: '10px', fontFamily: 'monospace', cursor: 'pointer', border: '1px solid #222', marginTop: '-6px', marginBottom: '15px' }
   };
 
   return (
     <div style={styles.container}>
       <style>{`@keyframes marquee { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }`}</style>
 
-      {/* POP-UP SAI MẠNG */}
       {showNetworkModal && (
         <div style={styles.networkModal}>
           <div style={{ background: COLORS.SURFACE, border: `1px solid ${COLORS.PINK}`, padding: '30px', borderRadius: '24px', maxWidth: '300px' }}>
@@ -361,7 +358,7 @@ export default function FlarePortal() {
            
            <div 
               style={styles.copyBadge} 
-              onClick={(e) => { e.stopPropagation(); handleCopy(); }}
+              onClick={(e) => { e.stopPropagation(); handleCopy(account); }}
             >
               <span style={{ color: copied ? COLORS.PRICE_GREEN : COLORS.PINK, fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {account}
@@ -430,6 +427,14 @@ export default function FlarePortal() {
           <section style={{ ...styles.card, border: `2px solid ${COLORS.AMBER}44` }}>
             <div style={{ ...styles.label, color: COLORS.AMBER }}>DELEGATION ACCOUNT (PDA)</div>
             
+            {/* PHẦN HIỂN THỊ ĐỊA CHỈ PDA MỚI THÊM VÀO */}
+            {pdaAddress && (
+              <div style={styles.pdaBadge} onClick={() => handleCopy(pdaAddress)} title="Click to copy">
+                <span style={{ opacity: 0.7 }}>Address:</span>
+                <span style={{ fontWeight: 'bold' }}>{pdaAddress.slice(0, 10)}...{pdaAddress.slice(-8)} 📋</span>
+              </div>
+            )}
+
             {(!isActivated && balances.pdaWflr === "0") ? (
               <div style={{ textAlign: 'center', padding: '10px 0' }}>
                 <p style={{ fontSize: '11px', color: COLORS.TEXT_MUTE, marginBottom: '15px' }}>Tài khoản PDA chưa được kích hoạt.</p>
