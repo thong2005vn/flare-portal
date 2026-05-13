@@ -104,13 +104,10 @@ export default function FlarePortal() {
     }
   };
 
-  // --- THỰC HIỆN ĐỔI MÀU NỀN NGOÀI APP ---
   useEffect(() => {
     document.body.style.backgroundColor = "#080808"; 
     document.body.style.margin = "0";
-    return () => {
-      document.body.style.backgroundColor = ""; 
-    };
+    return () => { document.body.style.backgroundColor = ""; };
   }, []);
 
   // --- LOGIC ĐẾM NGƯỢC ---
@@ -193,7 +190,7 @@ export default function FlarePortal() {
     try {
       const p = getProvider();
 
-      // Kiểm tra trạng thái PDA qua owner
+      // Kiểm tra trạng thái PDA qua owner - Đây là mấu chốt của biến isActivated
       try {
         const pdaContract = new ethers.Contract(pda, ["function owner() view returns (address)"], p);
         const pdaOwner = await pdaContract.owner();
@@ -355,36 +352,19 @@ export default function FlarePortal() {
            <div style={styles.qrContainer} onClick={(e) => e.stopPropagation()}>
               <QRCodeSVG value={account} size={220} />
            </div>
-           
-           <div 
-              style={styles.copyBadge} 
-              onClick={(e) => { e.stopPropagation(); handleCopy(account); }}
-            >
-              <span style={{ color: copied ? COLORS.PRICE_GREEN : COLORS.PINK, fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {account}
-              </span>
+           <div style={styles.copyBadge} onClick={(e) => { e.stopPropagation(); handleCopy(account); }}>
+              <span style={{ color: copied ? COLORS.PRICE_GREEN : COLORS.PINK, fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{account}</span>
               <span style={{ fontSize: '14px' }}>{copied ? "✅" : "📋"}</span>
            </div>
-           <div style={{ fontSize: '10px', color: COLORS.TEXT_MUTE, marginTop: '8px', marginBottom: '25px' }}>
-              {copied ? "Address copied to clipboard!" : "Click the address to copy"}
-           </div>
-
+           <div style={{ fontSize: '10px', color: COLORS.TEXT_MUTE, marginTop: '8px', marginBottom: '25px' }}>{copied ? "Address copied to clipboard!" : "Click the address to copy"}</div>
            <button onClick={() => setShowQR(false)} style={{ ...styles.btn, background: COLORS.PINK, color: 'white', padding: '12px 40px', borderRadius: '20px' }}>CLOSE</button>
         </div>
       )}
 
       <header style={{ textAlign: 'center', marginBottom: '10px', marginTop: '5px' }}>
         <h2 style={{ color: COLORS.PINK, letterSpacing: '3px', margin: 0 }}>OZPRO FLARE <span style={{ fontWeight: 300, color: '#fff' }}>MANAGER </span></h2>
-        
         {account && (
-          <div 
-            onClick={() => setShowQR(true)}
-            style={{ 
-              display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#161616', 
-              padding: '6px 14px', borderRadius: '20px', border: `1px solid ${COLORS.BORDER}`, 
-              marginTop: '12px', cursor: 'pointer', transition: '0.2s' 
-            }}
-          >
+          <div onClick={() => setShowQR(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#161616', padding: '6px 14px', borderRadius: '20px', border: `1px solid ${COLORS.BORDER}`, marginTop: '12px', cursor: 'pointer' }}>
             <span style={{ fontSize: '12px', color: COLORS.PINK, fontWeight: 'bold' }}>{account.slice(0, 6)}...{account.slice(-4)}</span>
             <span style={{ fontSize: '14px' }}> 📲⛆</span>
           </div>
@@ -427,7 +407,6 @@ export default function FlarePortal() {
           <section style={{ ...styles.card, border: `2px solid ${COLORS.AMBER}44` }}>
             <div style={{ ...styles.label, color: COLORS.AMBER }}>DELEGATION ACCOUNT (PDA)</div>
             
-            {/* PHẦN HIỂN THỊ ĐỊA CHỈ PDA MỚI THÊM VÀO */}
             {pdaAddress && (
               <div style={styles.pdaBadge} onClick={() => handleCopy(pdaAddress)} title="Click to copy">
                 <span style={{ opacity: 0.7 }}>Address:</span>
@@ -435,56 +414,33 @@ export default function FlarePortal() {
               </div>
             )}
 
-            {(!isActivated && balances.pdaWflr === "0") ? (
+            {/* LOGIC FIXED: Chỉ hiển thị nút kích hoạt nếu isActivated là false, không phụ thuộc 5s hay số dư */}
+            {!isActivated ? (
               <div style={{ textAlign: 'center', padding: '10px 0' }}>
-                <p style={{ fontSize: '11px', color: COLORS.TEXT_MUTE, marginBottom: '15px' }}>Tài khoản PDA chưa được kích hoạt.</p>
-                <button onClick={handleEnablePDA} style={{ ...styles.btn, width: '100%', background: COLORS.AMBER, color: 'black' }}>⚡ KÍCH HOẠT PDA</button>
+                <p style={{ fontSize: '12px', color: COLORS.AMBER, marginBottom: '15px', lineHeight: '1.5' }}>
+                  Tài khoản PDA của bạn chưa được khởi tạo.<br/>Vui lòng kích hoạt để bắt đầu.
+                </p>
+                <button onClick={handleEnablePDA} style={{ ...styles.btn, width: '100%', background: COLORS.AMBER, color: 'black', fontSize: '13px', padding: '15px' }}>⚡ KÍCH HOẠT PDA NGAY</button>
               </div>
             ) : (
               <>
                 <div style={{ marginBottom: 15 }}><div style={{ fontSize: 24, fontWeight: '900' }}>{Number(balances.pdaWflr).toLocaleString()} <small style={{ color: COLORS.AMBER, fontSize: 18 }}> WFLR</small></div><div style={{ fontSize: 12, color: COLORS.TEXT_MUTE }}>{toUSD(balances.pdaWflr)}</div></div>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                  <input type="number" value={pdaAmount} onChange={(e) => setPdaAmount(e.target.value)} style={styles.input} placeholder="Điền số lượng rút vào đây trước..." />
+                  <input type="number" value={pdaAmount} onChange={(e) => setPdaAmount(e.target.value)} style={styles.input} placeholder="Số lượng rút..." />
                   <button onClick={() => setPdaAmount(balances.pdaWflr)} style={{ ...styles.btn, background: COLORS.AMBER, color: 'black' }}>MAX</button>
                 </div>
                 <button onClick={handleWithdrawPDA} style={{ ...styles.btn, width: '100%', background: COLORS.AMBER, color: COLORS.PINK, border: `3px solid ${COLORS.AMBER}66`, marginBottom: 20 }}>⤺ RÚT WFLR VỀ MAIN WALLET</button>
 
-                <div style={{
-                  background: 'rgba(0,0,0,0.5)',
-                  padding: '16px',
-                  borderRadius: '20px',
-                  border: `1px solid ${timeLeft > 0 ? COLORS.BORDER : COLORS.PINK + '44'}`,
-                }}>
+                <div style={{ background: 'rgba(0,0,0,0.5)', padding: '16px', borderRadius: '20px', border: `1px solid ${timeLeft > 0 ? COLORS.BORDER : COLORS.PINK + '44'}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <div style={{ fontSize: '10px', color: timeLeft > 0 ? COLORS.TEXT_MUTE : COLORS.PINK, fontWeight: '800', marginBottom: '4px' }}>
-                        {timeLeft > 0 ? "NEXT REWARD CYCLE" : "UNCLAIMED REWARDS"}
-                      </div>
-                      <div style={{ fontSize: '20px', fontWeight: '900' }}>
-                        {timeLeft > 0 ? renderCountdown(timeLeft) : <span style={{ color: COLORS.PRICE_GREEN }}>+{Number(balances.reward).toFixed(2)} FLR</span>}
-                      </div>
+                      <div style={{ fontSize: '10px', color: timeLeft > 0 ? COLORS.TEXT_MUTE : COLORS.PINK, fontWeight: '800', marginBottom: '4px' }}>{timeLeft > 0 ? "NEXT REWARD CYCLE" : "UNCLAIMED REWARDS"}</div>
+                      <div style={{ fontSize: '20px', fontWeight: '900' }}>{timeLeft > 0 ? renderCountdown(timeLeft) : <span style={{ color: COLORS.PRICE_GREEN }}>+{Number(balances.reward).toFixed(2)} FLR</span>}</div>
                     </div>
-                    <button
-                      onClick={handleClaim}
-                      disabled={Number(balances.reward) <= 0}
-                      style={{
-                        ...styles.btn,
-                        minWidth: '85px',
-                        background: timeLeft > 0 ? "transparent" : COLORS.AMBER,
-                        color: timeLeft > 0 ? COLORS.TEXT_MUTE : 'black',
-                        border: timeLeft > 0 ? `1px solid ${COLORS.BORDER}` : 'none'
-                      }}
-                    >
-                      {timeLeft > 0 ? "LOCKED" : "CLAIM"}
-                    </button>
+                    <button onClick={handleClaim} disabled={Number(balances.reward) <= 0} style={{ ...styles.btn, minWidth: '85px', background: timeLeft > 0 ? "transparent" : COLORS.AMBER, color: timeLeft > 0 ? COLORS.TEXT_MUTE : 'black', border: timeLeft > 0 ? `1px solid ${COLORS.BORDER}` : 'none' }}>{timeLeft > 0 ? "LOCKED" : "CLAIM"}</button>
                   </div>
                   <div style={{ width: '100%', height: '4px', background: '#222', borderRadius: '10px', marginTop: '12px', overflow: 'hidden' }}>
-                    <div style={{
-                      width: `${Math.max(0, 100 - (timeLeft / CYCLE_SECONDS * 100))}%`,
-                      height: '100%',
-                      background: timeLeft > 0 ? COLORS.PINK : COLORS.PRICE_GREEN,
-                      transition: 'width 1s linear'
-                    }} />
+                    <div style={{ width: `${Math.max(0, 100 - (timeLeft / CYCLE_SECONDS * 100))}%`, height: '100%', background: timeLeft > 0 ? COLORS.PINK : COLORS.PRICE_GREEN, transition: 'width 1s linear' }} />
                   </div>
                 </div>
               </>
@@ -499,17 +455,11 @@ export default function FlarePortal() {
                 <button onClick={() => handleDelegate(d.addr, 0)} style={{ background: '#ff444411', border: 'none', color: '#ff4444', padding: '5px 10px', borderRadius: 8 }}>✕</button>
               </div>
             ))}
-
             <div ref={dropdownRef} style={{ position: 'relative', marginTop: 12 }}>
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                 <span style={{ position: 'absolute', left: 12, color: COLORS.TEXT_MUTE }}>🔍</span>
-                <input
-                  type="text" placeholder="Tìm Provider..." value={providerSearch}
-                  onFocus={() => setShowDropdown(true)} onChange={(e) => setProviderSearch(e.target.value)}
-                  style={{ ...styles.input, paddingLeft: 35, width: '100%', boxSizing: 'border-box' }}
-                />
+                <input type="text" placeholder="Tìm Provider..." value={providerSearch} onFocus={() => setShowDropdown(true)} onChange={(e) => setProviderSearch(e.target.value)} style={{ ...styles.input, paddingLeft: 35, width: '100%', boxSizing: 'border-box' }} />
               </div>
-
               {showDropdown && (
                 <div style={{ position: 'absolute', bottom: '110%', left: 0, right: 0, background: '#181818', borderRadius: 15, border: '1px solid #333', maxHeight: 150, overflowY: 'auto', zIndex: 100, boxShadow: '0 -10px 20px rgba(0,0,0,0.5)' }}>
                   {filteredProviders.map(p => (
@@ -517,7 +467,6 @@ export default function FlarePortal() {
                   ))}
                 </div>
               )}
-
               {pendingProvider && (
                 <div style={{ marginTop: 12, padding: 12, background: 'rgba(227, 24, 100, 0.1)', borderRadius: 16, border: `1px dashed ${COLORS.PINK}`, textAlign: 'center' }}>
                   <div style={{ fontSize: 12, marginBottom: 8 }}>Ủy quyền cho <b>{pendingProvider.name}</b>?</div>
