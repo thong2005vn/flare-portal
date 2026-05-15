@@ -474,7 +474,7 @@ export default function FlarePortal() {
                 <div style={{ background: 'rgba(0,0,0,0.5)', padding: '16px', borderRadius: '20px', border: `1px solid ${timeLeft > 0 ? COLORS.BORDER : COLORS.PINK + '44'}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <div style={{ fontSize: '10px', color: timeLeft > 0 ? COLORS.TEXT_MUTE : COLORS.PINK, fontWeight: '800', marginBottom: '4px' }}>{timeLeft > 0 ? "NEXT REWARD CYCLE" : "UNCLAIMED REWARDS"}</div>
+                      <div style={{ fontSize: '10px', color: timeLeft > 0 ? COLORS.TEXT_MUTE : COLORS.AMBER, fontWeight: '800', marginBottom: '4px' }}>{timeLeft > 0 ? "NEXT REWARD CYCLE" : "UNCLAIMED REWARDS"}</div>
                       <div style={{ fontSize: '20px', fontWeight: '900' }}>{timeLeft > 0 ? renderCountdown(timeLeft) : <span style={{ color: COLORS.PRICE_GREEN }}>+{Number(balances.reward).toFixed(2)} FLR</span>}</div>
                     </div>
                     <button onClick={handleClaim} disabled={Number(balances.reward) <= 0} style={{ ...styles.btn, minWidth: '85px', background: timeLeft > 0 ? "transparent" : COLORS.AMBER, color: timeLeft > 0 ? COLORS.TEXT_MUTE : 'black', border: timeLeft > 0 ? `1px solid ${COLORS.BORDER}` : 'none' }}>{timeLeft > 0 ? "LOCKED" : "CLAIM"}</button>
