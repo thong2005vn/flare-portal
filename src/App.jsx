@@ -26,7 +26,8 @@ const COLORS = {
 };
 
 const PROVIDERS = [
-  { name: "Zellic", address: "0x76e5591dda384a30eeb53fd4059c9570ee072e7e" },
+  { name: "FTSO Paris", address: "0x085841b253590281cc5c5222b09d4e59a605e774" },
+  { name: "FTSO Asia", address: "0xdd7b2bac728f027f23add7128711ecb60f761ad5" },
   { name: "ITB Validator", address: "0x2e8320b92b640cf8cbdeaffbe70d4bc407303b9f" },
   { name: "HEWG", address: "0xb6d68ea6c4de734ec481f92afd1c35f712441b73" },
   { name: "uGaenn", address: "0xe3a76233885e355cfaf141d7dd3d92705c9db4d5" },
@@ -56,8 +57,6 @@ const PROVIDERS = [
   { name: "FlareBase", address: "0xac2884a4479bf7c21aa0462d52bc9c76c3a9a3dd" },
   { name: "InfStones", address: "0xb1aa0f2691db6bbb2969efc7be70787f58dd2461" },
   { name: "SenseiNode", address: "0xe08898b7b8b18dbcddcc6339c8b9c19effa81413" },
-  { name: "FTSO Paris", address: "0x085841b253590281cc5c5222b09d4e59a605e774" },
-  { name: "FTSO Asia", address: "0xdd7b2bac728f027f23add7128711ecb60f761ad5" },
   { name: "Flaris", address: "0xf8b1dcf2594afd082aae088661bf574cb9bbdc61" },
   { name: "Stakeway", address: "0xf26be97eb0d7a9fbf8d67f813d3be411445885ce" },
   { name: "Use Your Spark", address: "0xa288054b230dcbb8689ac229d6dbd7df39203181" }
