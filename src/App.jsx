@@ -220,15 +220,26 @@ export default function FlarePortal() {
 
       setBalances({ flr: ethers.formatEther(f), wflr: ethers.formatEther(w), pdaWflr: ethers.formatEther(pw), reward: ethers.formatEther(totalRewardWei) });
 
-      const [dA, bA, , count] = del;
+      // --- PHẦN TÍCH HỢP MỚI: XỬ LÝ NHIỀU PROVIDERS ---
+      const [addresses, bips, , ] = del;
       const currentDels = [];
-      for (let i = 0; i < Number(count); i++) {
-        if (dA[i] && dA[i] !== ethers.ZeroAddress) {
-          const pInfo = PROVIDERS.find(prov => prov.address.toLowerCase() === dA[i].toLowerCase());
-          currentDels.push({ name: pInfo ? pInfo.name : "Provider", addr: dA[i], pct: Number(bA[i]) / 100 });
-        }
+      
+      if (addresses && addresses.length > 0) {
+        addresses.forEach((delegateAddr, i) => {
+          // Chỉ lấy các địa chỉ khác ZeroAddress và có tỷ lệ > 0
+          if (delegateAddr !== ethers.ZeroAddress && bips[i] > 0n) {
+            const pInfo = PROVIDERS.find(prov => prov.address.toLowerCase() === delegateAddr.toLowerCase());
+            currentDels.push({ 
+              name: pInfo ? pInfo.name : `${delegateAddr.slice(0, 6)}...`, 
+              addr: delegateAddr, 
+              pct: Number(bips[i]) / 100 
+            });
+          }
+        });
       }
       setDelegations(currentDels);
+      // -----------------------------------------------
+
     } catch (e) { console.error(e); }
   }, [getProvider]);
 
@@ -263,7 +274,6 @@ export default function FlarePortal() {
     refreshData(accs[0], pda);
   };
 
-  // --- HÀM NGẮT KẾT NỐI ---
   const disconnect = () => {
     setAccount("");
     setPdaAddress("");
@@ -320,8 +330,14 @@ export default function FlarePortal() {
 
   const handleDelegate = (target, pct = 50) => execute(pct === 0 ? "Hủy" : "Ủy quyền", async () => {
     const s = await (getProvider()).getSigner();
-    const w = new ethers.Contract(WNAT, ["function delegate(address,uint256)"], s);
-    return w.delegate(target, pct * 100);
+    const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, ["function delegate(address,uint256) external"], s);
+    return csm.delegate(target, pct * 100);
+  });
+
+  const handleUndelegateAll = () => execute("Hủy toàn bộ", async () => {
+    const s = await (getProvider()).getSigner();
+    const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, ["function undelegateAll() external"], s);
+    return csm.undelegateAll();
   });
 
   const filteredProviders = useMemo(() =>
@@ -343,7 +359,8 @@ export default function FlarePortal() {
     copyBadge: { background: '#161616', padding: '12px 18px', borderRadius: '16px', border: `1px solid ${COLORS.BORDER}`, display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', maxWidth: '100%' },
     networkModal: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '20px', textAlign: 'center' },
     pdaBadge: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0a0a0a', color: COLORS.AMBER, padding: '8px 12px', borderRadius: '10px', fontSize: '10px', fontFamily: 'monospace', cursor: 'pointer', border: '1px solid #222', marginTop: '-6px', marginBottom: '15px' },
-    logoutBtn: { background: 'transparent', border: `1px solid ${COLORS.BORDER}`, color: COLORS.TEXT_MUTE, borderRadius: '20px', padding: '6px 12px', cursor: 'pointer', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', transition: 'all 0.2s' }
+    logoutBtn: { background: 'transparent', border: `1px solid ${COLORS.BORDER}`, color: COLORS.TEXT_MUTE, borderRadius: '20px', padding: '6px 12px', cursor: 'pointer', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', transition: 'all 0.2s' },
+    undelegateBtn: { background: 'transparent', color: COLORS.PINK, border: `1px solid ${COLORS.PINK}44`, fontSize: '9px', padding: '4px 8px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }
   };
 
   return (
@@ -471,33 +488,42 @@ export default function FlarePortal() {
           </section>
 
           <section style={{ ...styles.card, border: `2px solid ${COLORS.PINK}44` }}>
-            <div style={styles.label}>Delegations ({delegations.length}/2)</div>
-            {delegations.map((d, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #222' }}>
-                <div><div style={{ fontWeight: 'bold' }}>{d.name}</div><div style={{ fontSize: 11, color: COLORS.PINK }}>{d.pct}% Power</div></div>
-                <button onClick={() => handleDelegate(d.addr, 0)} style={{ background: '#ff444411', border: 'none', color: '#ff4444', padding: '5px 10px', borderRadius: 8 }}>✕</button>
-              </div>
-            ))}
-            <div ref={dropdownRef} style={{ position: 'relative', marginTop: 12 }}>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <span style={{ position: 'absolute', left: 12, color: COLORS.TEXT_MUTE }}>🔍</span>
-                <input type="text" placeholder="Tìm Provider..." value={providerSearch} onFocus={() => setShowDropdown(true)} onChange={(e) => setProviderSearch(e.target.value)} style={{ ...styles.input, paddingLeft: 35, width: '100%', boxSizing: 'border-box' }} />
-              </div>
-              {showDropdown && (
-                <div style={{ position: 'absolute', bottom: '110%', left: 0, right: 0, background: '#181818', borderRadius: 15, border: '1px solid #333', maxHeight: 150, overflowY: 'auto', zIndex: 100, boxShadow: '0 -10px 20px rgba(0,0,0,0.5)' }}>
-                  {filteredProviders.map(p => (
-                    <div key={p.address} onClick={() => { setPendingProvider(p); setProviderSearch(p.name); setShowDropdown(false); }} style={{ padding: 12, fontSize: 13, borderBottom: '1px solid #222', cursor: 'pointer' }}>{p.name} <span style={{ color: COLORS.PINK, float: 'right' }}>50%</span></div>
-                  ))}
-                </div>
-              )}
-              {pendingProvider && (
-                <div style={{ marginTop: 12, padding: 12, background: 'rgba(227, 24, 100, 0.1)', borderRadius: 16, border: `1px dashed ${COLORS.PINK}`, textAlign: 'center' }}>
-                  <div style={{ fontSize: 12, marginBottom: 8 }}>Ủy quyền cho <b>{pendingProvider.name}</b>?</div>
-                  <button onClick={() => handleDelegate(pendingProvider.address, 50)} style={{ ...styles.btn, background: COLORS.PINK, color: 'white', width: '100%', padding: '10px' }}>KÝ XÁC NHẬN (50%)</button>
-                  <div onClick={() => { setPendingProvider(null); setProviderSearch(""); }} style={{ fontSize: 10, marginTop: 8, color: COLORS.TEXT_MUTE, cursor: 'pointer', textDecoration: 'underline' }}>Hủy chọn</div>
-                </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div style={{ ...styles.label, marginBottom: 0 }}>Delegations ({delegations.length}/2)</div>
+              {delegations.length > 0 && (
+                <button onClick={handleUndelegateAll} style={styles.undelegateBtn}>UNDELEGATE ALL</button>
               )}
             </div>
+            
+            {delegations.map((d, i) => (
+              <div key={d.addr || i} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: i === delegations.length - 1 ? 'none' : '1px solid #222' }}>
+                <div><div style={{ fontWeight: 'bold' }}>{d.name}</div><div style={{ fontSize: 11, color: COLORS.PINK }}>{d.pct}% Power</div></div>
+                <button onClick={() => handleDelegate(d.addr, 0)} style={{ background: '#ff444411', border: 'none', color: '#ff4444', padding: '5px 10px', borderRadius: 8, cursor: 'pointer' }}>✕</button>
+              </div>
+            ))}
+            
+            {delegations.length < 2 && (
+              <div ref={dropdownRef} style={{ position: 'relative', marginTop: 12 }}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <span style={{ position: 'absolute', left: 12, color: COLORS.TEXT_MUTE }}>🔍</span>
+                  <input type="text" placeholder="Tìm Provider..." value={providerSearch} onFocus={() => setShowDropdown(true)} onChange={(e) => setProviderSearch(e.target.value)} style={{ ...styles.input, paddingLeft: 35, width: '100%', boxSizing: 'border-box' }} />
+                </div>
+                {showDropdown && (
+                  <div style={{ position: 'absolute', bottom: '110%', left: 0, right: 0, background: '#181818', borderRadius: 15, border: '1px solid #333', maxHeight: 150, overflowY: 'auto', zIndex: 100, boxShadow: '0 -10px 20px rgba(0,0,0,0.5)' }}>
+                    {filteredProviders.map(p => (
+                      <div key={p.address} onClick={() => { setPendingProvider(p); setProviderSearch(p.name); setShowDropdown(false); }} style={{ padding: 12, fontSize: 13, borderBottom: '1px solid #222', cursor: 'pointer' }}>{p.name} <span style={{ color: COLORS.PINK, float: 'right' }}>50%</span></div>
+                    ))}
+                  </div>
+                )}
+                {pendingProvider && (
+                  <div style={{ marginTop: 12, padding: 12, background: 'rgba(227, 24, 100, 0.1)', borderRadius: 16, border: `1px dashed ${COLORS.PINK}`, textAlign: 'center' }}>
+                    <div style={{ fontSize: 12, marginBottom: 8 }}>Ủy quyền cho <b>{pendingProvider.name}</b>?</div>
+                    <button onClick={() => handleDelegate(pendingProvider.address, 50)} style={{ ...styles.btn, background: COLORS.PINK, color: 'white', width: '100%', padding: '10px' }}>KÝ XÁC NHẬN (50%)</button>
+                    <div onClick={() => { setPendingProvider(null); setProviderSearch(""); }} style={{ fontSize: 10, marginTop: 8, color: COLORS.TEXT_MUTE, cursor: 'pointer', textDecoration: 'underline' }}>Hủy chọn</div>
+                  </div>
+                )}
+              </div>
+            )}
           </section>
 
           <div style={{ textAlign: 'center', fontSize: 11, color: COLORS.PINK, fontWeight: 'bold' }}>● {status.toUpperCase()}</div>
