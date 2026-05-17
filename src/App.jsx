@@ -300,7 +300,6 @@ export default function FlarePortal() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Hàm điều hướng đến Explorer
   const handleOpenExplorer = (addr) => {
     if (!addr) return;
     window.open(`${FLARE_PARAMS.blockExplorerUrls[0]}address/${addr}`, "_blank", "noopener,noreferrer");
@@ -373,7 +372,8 @@ export default function FlarePortal() {
     card: { boxSizing: 'border-box', background: COLORS.SURFACE, padding: "20px", borderRadius: "24px", marginBottom: "16px", border: "1px solid #1f1f1f" },
     label: { fontSize: "11px", color: COLORS.TEXT_MUTE, fontWeight: "800", letterSpacing: "1px", marginBottom: "12px", textTransform: "uppercase" },
     input: { flex: 1, padding: "12px", borderRadius: "14px", background: "#080808", color: "white", border: "1px solid #222", outline: "none" },
-    btn: { padding: "12px", borderRadius: "14px", border: "none", cursor: "pointer", fontWeight: "bold", fontSize: "12px" },
+    // Cấu trúc nút cơ bản chung
+    btnBase: { padding: "12px", borderRadius: "14px", border: "1px solid transparent", cursor: "pointer", fontWeight: "bold", fontSize: "12px", transition: "all 0.3s ease" },
     tickerWrap: { width: 'calc(100% + 48px)', overflow: 'hidden', background: '#0a0a0a', borderTop: `1px solid ${COLORS.BORDER}`, borderBottom: `1px solid ${COLORS.BORDER}`, padding: '12px 0', margin: '15px -24px 25px -24px' },
     ticker: { display: 'inline-block', whiteSpace: 'nowrap', animation: 'marquee 50s linear infinite', paddingLeft: '100%' },
     assetName: { fontWeight: '800', marginRight: '6px' },
@@ -388,6 +388,21 @@ export default function FlarePortal() {
     scanBtn: { display: 'inline-flex', alignItems: 'center', background: '#161616', color: COLORS.TEXT_MUTE, border: `1px solid ${COLORS.BORDER}`, borderRadius: '20px', padding: '6px 12px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase', transition: 'all 0.2s' }
   };
 
+  // Hàm tạo style động có hiệu ứng Glow dựa vào mã màu gốc
+  const makeGlowEffect = (e, baseColor, isHover, textColor = "white") => {
+    if (isHover) {
+      e.currentTarget.style.background = "transparent";
+      e.currentTarget.style.borderColor = baseColor;
+      e.currentTarget.style.color = baseColor;
+      e.currentTarget.style.boxShadow = `0 0 15px ${baseColor}88`;
+    } else {
+      e.currentTarget.style.background = baseColor;
+      e.currentTarget.style.borderColor = "transparent";
+      e.currentTarget.style.color = textColor;
+      e.currentTarget.style.boxShadow = "none";
+    }
+  };
+
   return (
     <div style={styles.container}>
       <style>{`@keyframes marquee { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }`}</style>
@@ -398,7 +413,14 @@ export default function FlarePortal() {
             <div style={{ fontSize: '40px', marginBottom: '15px' }}>🌐</div>
             <h3 style={{ margin: '0 0 10px 0' }}>SAI MẠNG KẾT NỐI</h3>
             <p style={{ fontSize: '13px', color: COLORS.TEXT_MUTE, marginBottom: '20px' }}>Ứng dụng yêu cầu mạng <b>Flare Mainnet</b> để hoạt động.</p>
-            <button onClick={handleSwitchNetwork} style={{ ...styles.btn, background: COLORS.PINK, color: 'white', width: '100%', padding: '15px' }}>CHUYỂN SANG FLARE</button>
+            <button 
+              onClick={handleSwitchNetwork} 
+              style={{ ...styles.btnBase, background: COLORS.PINK, color: 'white', width: '100%', padding: '15px' }}
+              onMouseOver={(e) => makeGlowEffect(e, COLORS.PINK, true)}
+              onMouseOut={(e) => makeGlowEffect(e, COLORS.PINK, false)}
+            >
+              CHUYỂN SANG FLARE
+            </button>
           </div>
         </div>
       )}
@@ -413,7 +435,14 @@ export default function FlarePortal() {
                <span style={{ fontSize: '14px' }}>{copied ? "✅" : "📋"}</span>
             </div>
             <div style={{ fontSize: '10px', color: COLORS.TEXT_MUTE, marginTop: '8px', marginBottom: '25px' }}>{copied ? "Địa chỉ đã được copy!" : "Click vào địa chỉ để copy"}</div>
-            <button onClick={() => setShowQR(false)} style={{ ...styles.btn, background: COLORS.PINK, color: 'white', padding: '12px 40px', borderRadius: '20px' }}>ĐÓNG</button>
+            <button 
+              onClick={() => setShowQR(false)} 
+              style={{ ...styles.btnBase, background: COLORS.PINK, color: 'white', padding: '12px 40px', borderRadius: '20px' }}
+              onMouseOver={(e) => makeGlowEffect(e, COLORS.PINK, true)}
+              onMouseOut={(e) => makeGlowEffect(e, COLORS.PINK, false)}
+            >
+              ĐÓNG
+            </button>
         </div>
       )}
 
@@ -421,18 +450,16 @@ export default function FlarePortal() {
         <h2 style={{ color: COLORS.PINK, letterSpacing: '3px', margin: 0 }}>OZPRO FLARE <span style={{ fontWeight: 300, color: '#fff' }}>MANAGER </span></h2>
         {account && (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
-            {/* Click vào khu vực ví mở QR Code */}
             <div onClick={() => setShowQR(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#161616', padding: '6px 14px', borderRadius: '20px', border: `1px solid ${COLORS.BORDER}`, cursor: 'pointer' }}>
               <span style={{ fontSize: '12px', color: COLORS.PINK, fontWeight: 'bold' }}>{account.slice(0, 6)}...{account.slice(-4)}</span>
               <span style={{ fontSize: '12px' }}>📲</span>
             </div>
             
-            {/* Nút nhỏ Scan đi tới Flare Explorer */}
             <button 
               onClick={() => handleOpenExplorer(account)} 
               style={styles.scanBtn}
-              onMouseOver={(e) => { e.currentTarget.style.color = COLORS.PRICE_GREEN; e.currentTarget.style.borderColor = COLORS.PRICE_GREEN; }}
-              onMouseOut={(e) => { e.currentTarget.style.color = COLORS.TEXT_MUTE; e.currentTarget.style.borderColor = COLORS.BORDER; }}
+              onMouseOver={(e) => { e.currentTarget.style.color = COLORS.PRICE_GREEN; e.currentTarget.style.borderColor = COLORS.PRICE_GREEN; e.currentTarget.style.boxShadow = `0 0 10px ${COLORS.PRICE_GREEN}55`; }}
+              onMouseOut={(e) => { e.currentTarget.style.color = COLORS.TEXT_MUTE; e.currentTarget.style.borderColor = COLORS.BORDER; e.currentTarget.style.boxShadow = "none"; }}
             >
               🔍 Scan
             </button>
@@ -440,8 +467,8 @@ export default function FlarePortal() {
             <button 
               onClick={disconnect} 
               style={styles.logoutBtn}
-              onMouseOver={(e) => { e.currentTarget.style.color = COLORS.PINK; e.currentTarget.style.borderColor = COLORS.PINK; }}
-              onMouseOut={(e) => { e.currentTarget.style.color = COLORS.TEXT_MUTE; e.currentTarget.style.borderColor = COLORS.BORDER; }}
+              onMouseOver={(e) => { e.currentTarget.style.color = COLORS.PINK; e.currentTarget.style.borderColor = COLORS.PINK; e.currentTarget.style.boxShadow = `0 0 10px ${COLORS.PINK}55`; }}
+              onMouseOut={(e) => { e.currentTarget.style.color = COLORS.TEXT_MUTE; e.currentTarget.style.borderColor = COLORS.BORDER; e.currentTarget.style.boxShadow = "none"; }}
             >
               Logout
             </button>
@@ -462,7 +489,14 @@ export default function FlarePortal() {
       </div>
 
       {!account ? (
-        <button onClick={connect} style={{ ...styles.btn, width: '100%', background: COLORS.PINK, color: 'white', padding: '18px' }}>KẾT NỐI VÍ METAMASK</button>
+        <button 
+          onClick={connect} 
+          style={{ ...styles.btnBase, width: '100%', background: COLORS.PINK, color: 'white', padding: '18px' }}
+          onMouseOver={(e) => makeGlowEffect(e, COLORS.PINK, true)}
+          onMouseOut={(e) => makeGlowEffect(e, COLORS.PINK, false)}
+        >
+          KẾT NỐI VÍ METAMASK
+        </button>
       ) : (
         <>
           <section style={{ ...styles.card, border: `2px solid ${COLORS.PINK}44` }}>
@@ -473,12 +507,43 @@ export default function FlarePortal() {
             </div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
               <input type="number" value={walletAmount} onChange={(e) => setWalletAmount(e.target.value)} style={styles.input} placeholder="Điền số FLR/WFLR..." />
-              <button onClick={() => setWalletAmount(balances.flr)} style={{ ...styles.btn, background: COLORS.PINK, color: 'white' }}>MAX</button>
+              <button 
+                onClick={() => setWalletAmount(balances.flr)} 
+                style={{ ...styles.btnBase, background: COLORS.PINK, color: 'white' }}
+                onMouseOver={(e) => makeGlowEffect(e, COLORS.PINK, true)}
+                onMouseOut={(e) => makeGlowEffect(e, COLORS.PINK, false)}
+              >
+                MAX
+              </button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: 8 }}>
-              <button onClick={() => handleWrap(true)} style={{ ...styles.btn, background: COLORS.PINK, color: 'white' }}>WRAP</button>
-              <button onClick={() => handleWrap(false)} style={{ ...styles.btn, background: COLORS.PINK, color: 'white' }}>UNWRAP</button>
-              <button onClick={handleToPDA} style={{ ...styles.btn, background: COLORS.PINK, color: 'yellow' }}>NẠP PDA</button>
+              <button 
+                onClick={() => handleWrap(true)} 
+                style={{ ...styles.btnBase, background: COLORS.PINK, color: 'white' }}
+                onMouseOver={(e) => makeGlowEffect(e, COLORS.PINK, true)}
+                onMouseOut={(e) => makeGlowEffect(e, COLORS.PINK, false)}
+              >
+                WRAP
+              </button>
+              <button 
+                onClick={() => handleWrap(false)} 
+                style={{ ...styles.btnBase, background: COLORS.PINK, color: 'white' }}
+                onMouseOver={(e) => makeGlowEffect(e, COLORS.PINK, true)}
+                onMouseOut={(e) => makeGlowEffect(e, COLORS.PINK, false)}
+              >
+                UNWRAP
+              </button>
+              <button 
+                onClick={handleToPDA} 
+                style={{ ...styles.btnBase, background: COLORS.PINK, color: 'yellow' }}
+                onMouseOver={(e) => makeGlowEffect(e, COLORS.PINK, true, "yellow")}
+                onMouseOut={(e) => {
+                  makeGlowEffect(e, COLORS.PINK, false);
+                  e.currentTarget.style.color = "yellow"; // Trả lại màu chữ ban đầu
+                }}
+              >
+                NẠP PDA
+              </button>
             </div>
           </section>
 
@@ -497,16 +562,45 @@ export default function FlarePortal() {
                 <p style={{ fontSize: '12px', color: COLORS.AMBER, marginBottom: '15px', lineHeight: '1.5' }}>
                   Tài khoản PDA của bạn chưa được khởi tạo.<br/>Vui lòng kích hoạt để bắt đầu.
                 </p>
-                <button onClick={handleEnablePDA} style={{ ...styles.btn, width: '100%', background: COLORS.AMBER, color: 'black', fontSize: '13px', padding: '15px' }}>⚡ KÍCH HOẠT PDA NGAY</button>
+                <button 
+                  onClick={handleEnablePDA} 
+                  style={{ ...styles.btnBase, width: '100%', background: COLORS.AMBER, color: 'black', fontSize: '13px', padding: '15px' }}
+                  onMouseOver={(e) => makeGlowEffect(e, COLORS.AMBER, true)}
+                  onMouseOut={(e) => makeGlowEffect(e, COLORS.AMBER, false, "black")}
+                >
+                  ⚡ KÍCH HOẠT PDA NGAY
+                </button>
               </div>
             ) : (
               <>
                 <div style={{ marginBottom: 15 }}><div style={{ fontSize: 24, fontWeight: '900' }}>{Number(balances.pdaWflr).toLocaleString()} <small style={{ color: COLORS.AMBER, fontSize: 18 }}> WFLR</small></div><div style={{ fontSize: 12, color: COLORS.TEXT_MUTE }}>{toUSD(balances.pdaWflr)}</div></div>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
                   <input type="number" value={pdaAmount} onChange={(e) => setPdaAmount(e.target.value)} style={styles.input} placeholder="Số lượng rút..." />
-                  <button onClick={() => setPdaAmount(balances.pdaWflr)} style={{ ...styles.btn, background: COLORS.AMBER, color: 'black' }}>MAX</button>
+                  <button 
+                    onClick={() => setPdaAmount(balances.pdaWflr)} 
+                    style={{ ...styles.btnBase, background: COLORS.AMBER, color: 'black' }}
+                    onMouseOver={(e) => makeGlowEffect(e, COLORS.AMBER, true)}
+                    onMouseOut={(e) => makeGlowEffect(e, COLORS.AMBER, false, "black")}
+                  >
+                    MAX
+                  </button>
                 </div>
-                <button onClick={handleWithdrawPDA} style={{ ...styles.btn, width: '100%', background: COLORS.AMBER, color: COLORS.PINK, border: `3px solid ${COLORS.AMBER}66`, marginBottom: 20 }}>⤺ RÚT WFLR VỀ MAIN WALLET</button>
+                <button 
+                  onClick={handleWithdrawPDA} 
+                  style={{ ...styles.btnBase, width: '100%', background: COLORS.AMBER, color: COLORS.PINK, border: `3px solid ${COLORS.AMBER}66`, marginBottom: 20 }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.borderColor = COLORS.AMBER;
+                    e.currentTarget.style.boxShadow = `0 0 15px ${COLORS.AMBER}88`;
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = COLORS.AMBER;
+                    e.currentTarget.style.borderColor = `${COLORS.AMBER}66`;
+                    e.currentTarget.style.boxShadow = "none";
+                  }}
+                >
+                  ⤺ RÚT WFLR VỀ MAIN WALLET
+                </button>
 
                 <div style={{ background: 'rgba(0,0,0,0.5)', padding: '16px', borderRadius: '20px', border: `1px solid ${timeLeft > 0 ? COLORS.BORDER : COLORS.PINK + '44'}` }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -518,11 +612,17 @@ export default function FlarePortal() {
                       onClick={handleClaim} 
                       disabled={Number(balances.reward) <= 0 || timeLeft > 0} 
                       style={{ 
-                        ...styles.btn, 
+                        ...styles.btnBase, 
                         minWidth: '85px', 
                         background: timeLeft > 0 ? "transparent" : COLORS.AMBER, 
                         color: timeLeft > 0 ? COLORS.TEXT_MUTE : 'black', 
                         border: timeLeft > 0 ? `1px solid ${COLORS.BORDER}` : 'none' 
+                      }}
+                      onMouseOver={(e) => {
+                        if(timeLeft <= 0 && Number(balances.reward) > 0) makeGlowEffect(e, COLORS.AMBER, true);
+                      }}
+                      onMouseOut={(e) => {
+                        if(timeLeft <= 0 && Number(balances.reward) > 0) makeGlowEffect(e, COLORS.AMBER, false, "black");
                       }}
                     >
                       {timeLeft > 0 ? "LOCKED" : "CLAIM"}
@@ -540,14 +640,28 @@ export default function FlarePortal() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <div style={{ ...styles.label, marginBottom: 0 }}>Delegations ({delegations.length}/2)</div>
               {delegations.length > 0 && (
-                <button onClick={handleUndelegateAll} style={styles.undelegateBtn}>UNDELEGATE ALL</button>
+                <button 
+                  onClick={handleUndelegateAll} 
+                  style={{ ...styles.undelegateBtn, transition: "all 0.2s" }}
+                  onMouseOver={(e) => { e.currentTarget.style.boxShadow = `0 0 10px ${COLORS.PINK}66`; e.currentTarget.style.background = `${COLORS.PINK}22`; }}
+                  onMouseOut={(e) => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.background = "transparent"; }}
+                >
+                  UNDELEGATE ALL
+                </button>
               )}
             </div>
             
             {delegations.map((d, i) => (
               <div key={d.addr || i} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: i === delegations.length - 1 ? 'none' : '1px solid #222' }}>
                 <div><div style={{ fontWeight: 'bold' }}>{d.name}</div><div style={{ fontSize: 11, color: COLORS.PINK }}>{d.pct}% Power</div></div>
-                <button onClick={() => handleDelegate(d.addr, 0)} style={{ background: '#ff444411', border: 'none', color: '#ff4444', padding: '5px 10px', borderRadius: 8, cursor: 'pointer' }}>✕</button>
+                <button 
+                  onClick={() => handleDelegate(d.addr, 0)} 
+                  style={{ background: '#ff444411', border: 'none', color: '#ff4444', padding: '5px 10px', borderRadius: 8, cursor: 'pointer', transition: 'all 0.2s' }}
+                  onMouseOver={(e) => { e.currentTarget.style.boxShadow = "0 0 10px #ff444455"; e.currentTarget.style.background = "#ff444433"; }}
+                  onMouseOut={(e) => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.background = "#ff444411"; }}
+                >
+                  ✕
+                </button>
               </div>
             ))}
             
@@ -567,7 +681,14 @@ export default function FlarePortal() {
                 {pendingProvider && (
                   <div style={{ marginTop: 12, padding: 12, background: 'rgba(227, 24, 100, 0.1)', borderRadius: 16, border: `1px dashed ${COLORS.PINK}`, textAlign: 'center' }}>
                     <div style={{ fontSize: 12, marginBottom: 8 }}>Ủy quyền cho <b>{pendingProvider.name}</b>?</div>
-                    <button onClick={() => handleDelegate(pendingProvider.address, 50)} style={{ ...styles.btn, background: COLORS.PINK, color: 'white', width: '100%', padding: '10px' }}>KÝ XÁC NHẬN (50%)</button>
+                    <button 
+                      onClick={() => handleDelegate(pendingProvider.address, 50)} 
+                      style={{ ...styles.btnBase, background: COLORS.PINK, color: 'white', width: '100%', padding: '10px' }}
+                      onMouseOver={(e) => makeGlowEffect(e, COLORS.PINK, true)}
+                      onMouseOut={(e) => makeGlowEffect(e, COLORS.PINK, false)}
+                    >
+                      KÝ XÁC NHẬN (50%)
+                    </button>
                     <div onClick={() => { setPendingProvider(null); setProviderSearch(""); }} style={{ fontSize: 10, marginTop: 8, color: COLORS.TEXT_MUTE, cursor: 'pointer', textDecoration: 'underline' }}>Hủy chọn</div>
                   </div>
                 )}
