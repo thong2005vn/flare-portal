@@ -368,7 +368,6 @@ export default function FlarePortal() {
     [providerSearch]);
 
   const styles = {
-    // Đã tích hợp hiệu ứng Glow hồng mờ bao phủ bên ngoài khung App ở dòng box-shadow dưới này
     container: { boxSizing: 'border-box', padding: "24px", maxWidth: "420px", margin: "40px auto", background: COLORS.DARK, color: "white", borderRadius: "32px", border: `1px solid ${COLORS.BORDER}`, boxShadow: `0 0 40px 10px ${COLORS.PINK}22, 0 0 100px 30px ${COLORS.PINK}0a`, fontFamily: "sans-serif", position: 'relative', overflow: "hidden" },
     card: { boxSizing: 'border-box', background: COLORS.SURFACE, padding: "20px", borderRadius: "24px", marginBottom: "16px", border: "1px solid #1f1f1f" },
     label: { fontSize: "11px", color: COLORS.TEXT_MUTE, fontWeight: "800", letterSpacing: "1px", marginBottom: "12px", textTransform: "uppercase" },
@@ -448,7 +447,7 @@ export default function FlarePortal() {
       <header style={{ textAlign: 'center', marginBottom: '10px', marginTop: '5px' }}>
         <h2 style={{ color: COLORS.PINK, letterSpacing: '3px', margin: 0 }}>OZPRO FLARE <span style={{ fontWeight: 300, color: '#fff' }}>MANAGER </span></h2>
         {account && (
-          <div style={{ display: 'flex', justifycontent: 'center', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '14px', flexWrap: 'wrap' }}>
             <div onClick={() => setShowQR(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#161616', padding: '6px 14px', borderRadius: '20px', border: `1px solid ${COLORS.BORDER}`, cursor: 'pointer' }}>
               <span style={{ fontSize: '12px', color: COLORS.PINK, fontWeight: 'bold' }}>{account.slice(0, 6)}...{account.slice(-4)}</span>
               <span style={{ fontSize: '12px' }}>📲</span>
@@ -550,7 +549,7 @@ export default function FlarePortal() {
             <div style={{ ...styles.label, color: COLORS.AMBER }}>DELEGATION ACCOUNT (PDA)</div>
             
             {pdaAddress && (
-              <div style={styles.pdaBadge} onClick={() => handleCopy(pdaAddress)} title="Click to copy">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0a0a0a', color: COLORS.AMBER, padding: '8px 12px', borderRadius: '10px', fontSize: '10px', fontFamily: 'monospace', cursor: 'pointer', border: '1px solid #222', marginTop: '-6px', marginBottom: '15px' }} onClick={() => handleCopy(pdaAddress)} title="Click to copy">
                 <span style={{ opacity: 0.7 }}>Address:</span>
                 <span style={{ fontWeight: 'bold' }}>{pdaAddress.slice(0, 10)}...{pdaAddress.slice(-8)} 📋</span>
               </div>
