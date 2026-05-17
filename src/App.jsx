@@ -78,19 +78,33 @@ export default function FlarePortal() {
   const [showQR, setShowQR] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showNetworkModal, setShowNetworkModal] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(0);
 
-  // --- LOGIC KIỂM TRA MẠNG ---
+  const dropdownRef = useRef(null);
+  const CYCLE_SECONDS = 3.5 * 24 * 3600;
+
+  const getProvider = useCallback(() => {
+    if (!window.ethereum) return null;
+    return new ethers.BrowserProvider(window.ethereum);
+  }, []);
+
   const ensureFlareNetwork = async () => {
     if (!window.ethereum) return false;
-    const chainId = await window.ethereum.request({ method: "eth_chainId" });
-    if (chainId !== FLARE_PARAMS.chainId) {
-      setShowNetworkModal(true);
+    try {
+      const chainId = await window.ethereum.request({ method: "eth_chainId" });
+      if (chainId !== FLARE_PARAMS.chainId) {
+        setShowNetworkModal(true);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error(err);
       return false;
     }
-    return true;
   };
 
   const handleSwitchNetwork = async () => {
+    if (!window.ethereum) return;
     try {
       await window.ethereum.request({
         method: "wallet_switchEthereumChain",
@@ -99,10 +113,15 @@ export default function FlarePortal() {
       setShowNetworkModal(false);
     } catch (err) {
       if (err.code === 4902) {
-        await window.ethereum.request({
-          method: "wallet_addEthereumChain",
-          params: [FLARE_PARAMS],
-        });
+        try {
+          await window.ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [FLARE_PARAMS],
+          });
+          setShowNetworkModal(false);
+        } catch (addErr) {
+          console.error(addErr);
+        }
       }
     }
   };
@@ -112,10 +131,6 @@ export default function FlarePortal() {
     document.body.style.margin = "0";
     return () => { document.body.style.backgroundColor = ""; };
   }, []);
-
-  // --- LOGIC ĐẾM NGƯỢC ---
-  const [timeLeft, setTimeLeft] = useState(0);
-  const CYCLE_SECONDS = 3.5 * 24 * 3600;
 
   useEffect(() => {
     const savedEndTime = localStorage.getItem("claim_countdown_end");
@@ -156,8 +171,6 @@ export default function FlarePortal() {
     );
   };
 
-  const dropdownRef = useRef(null);
-
   useEffect(() => {
     const getAllPrices = async () => {
       try {
@@ -186,20 +199,18 @@ export default function FlarePortal() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const getProvider = useCallback(() => new ethers.BrowserProvider(window.ethereum), []);
-
   const refreshData = useCallback(async (addr, pda) => {
     if (!addr || !pda) return;
+    const p = getProvider();
+    if (!p) return;
     try {
-      const p = getProvider();
-
-      // Kiểm tra trạng thái PDA qua owner
+      let activated = false;
       try {
         const pdaContract = new ethers.Contract(pda, ["function owner() view returns (address)"], p);
         const pdaOwner = await pdaContract.owner();
-        setIsActivated(pdaOwner.toLowerCase() === addr.toLowerCase());
+        activated = (pdaOwner.toLowerCase() === addr.toLowerCase());
       } catch (e) {
-        setIsActivated(false);
+        activated = false;
       }
 
       const wnat = new ethers.Contract(WNAT, ["function balanceOf(address) view returns (uint256)", "function delegatesOf(address) view returns (address[], uint256[], uint256, uint256)"], p);
@@ -214,19 +225,19 @@ export default function FlarePortal() {
       let totalRewardWei = 0n;
       if (Array.isArray(rewardStates)) {
         rewardStates.forEach(epochArray => {
-          epochArray.forEach(state => { totalRewardWei += BigInt(state[2]); });
+          if (Array.isArray(epochArray)) {
+            epochArray.forEach(state => { totalRewardWei += BigInt(state[2]); });
+          }
         });
       }
 
+      setIsActivated(activated);
       setBalances({ flr: ethers.formatEther(f), wflr: ethers.formatEther(w), pdaWflr: ethers.formatEther(pw), reward: ethers.formatEther(totalRewardWei) });
 
-      // --- PHẦN TÍCH HỢP MỚI: XỬ LÝ NHIỀU PROVIDERS ---
-      const [addresses, bips, , ] = del;
+      const [addresses, bips] = del;
       const currentDels = [];
-      
       if (addresses && addresses.length > 0) {
         addresses.forEach((delegateAddr, i) => {
-          // Chỉ lấy các địa chỉ khác ZeroAddress và có tỷ lệ > 0
           if (delegateAddr !== ethers.ZeroAddress && bips[i] > 0n) {
             const pInfo = PROVIDERS.find(prov => prov.address.toLowerCase() === delegateAddr.toLowerCase());
             currentDels.push({ 
@@ -238,15 +249,12 @@ export default function FlarePortal() {
         });
       }
       setDelegations(currentDels);
-      // -----------------------------------------------
-
     } catch (e) { console.error(e); }
   }, [getProvider]);
 
   const execute = async (label, action) => {
     const isOk = await ensureFlareNetwork();
     if (!isOk) return;
-
     try {
       setStatus(`⏳ ${label}...`);
       const tx = await action();
@@ -257,8 +265,8 @@ export default function FlarePortal() {
         setTimeout(() => refreshData(account, pdaAddress), 1500);
       }
     } catch (e) {
-      if (e.code === "ACTION_REJECTED") setStatus("❌ Người dùng từ chối");
-      else setStatus(`❌ Lỗi: ${e.reason || "Giao dịch thất bại"}`);
+      if (e?.code === "ACTION_REJECTED" || e?.code === 4001) setStatus("❌ Người dùng từ chối");
+      else setStatus(`❌ Lỗi: ${e?.reason || "Giao dịch thất bại"}`);
     }
   };
 
@@ -266,12 +274,15 @@ export default function FlarePortal() {
     if (!window.ethereum) return alert("Cài MetaMask!");
     const isOk = await ensureFlareNetwork();
     if (!isOk) return;
-
-    const accs = await window.ethereum.request({ method: "eth_requestAccounts" });
-    const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, ["function accountToDelegationAccount(address) view returns (address)"], getProvider());
-    const pda = await csm.accountToDelegationAccount(accs[0]);
-    setAccount(accs[0]); setPdaAddress(pda);
-    refreshData(accs[0], pda);
+    try {
+      const p = getProvider();
+      if (!p) return;
+      const accs = await window.ethereum.request({ method: "eth_requestAccounts" });
+      const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, ["function accountToDelegationAccount(address) view returns (address)"], p);
+      const pda = await csm.accountToDelegationAccount(accs[0]);
+      setAccount(accs[0]); setPdaAddress(pda);
+      refreshData(accs[0], pda);
+    } catch (e) { console.error(e); }
   };
 
   const disconnect = () => {
@@ -289,20 +300,29 @@ export default function FlarePortal() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Hàm điều hướng đến Explorer
+  const handleOpenExplorer = (addr) => {
+    if (!addr) return;
+    window.open(`${FLARE_PARAMS.blockExplorerUrls[0]}address/${addr}`, "_blank", "noopener,noreferrer");
+  };
+
   const handleEnablePDA = () => execute("Kích hoạt PDA", async () => {
-    const s = await (getProvider()).getSigner();
+    const p = getProvider();
+    const s = await p.getSigner();
     const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, ["function enableDelegationAccount() external returns (address)"], s);
     return csm.enableDelegationAccount();
   });
 
   const handleWithdrawPDA = () => execute("Rút PDA", async () => {
-    const s = await (getProvider()).getSigner();
+    const p = getProvider();
+    const s = await p.getSigner();
     const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, ["function withdraw(uint256) external"], s);
     return csm.withdraw(ethers.parseEther(pdaAmount || "0"));
   });
 
   const handleClaim = () => execute("Nhận thưởng", async () => {
-    const s = await (getProvider()).getSigner();
+    const p = getProvider();
+    const s = await p.getSigner();
     const r = new ethers.Contract(REWARD_MANAGER, ["function claim(address,address,uint24,bool,tuple(bytes32[],tuple(uint24,bytes20,uint120,uint8))[])", "function getRewardEpochIdsWithClaimableRewards() view returns (uint24,uint24)"], s);
     const [, end] = await r.getRewardEpochIdsWithClaimableRewards();
     const tx = await r.claim(pdaAddress, pdaAddress, end, true, []);
@@ -316,26 +336,30 @@ export default function FlarePortal() {
   });
 
   const handleWrap = (isWrap) => execute(isWrap ? "Wrap" : "Unwrap", async () => {
-    const s = await (getProvider()).getSigner();
+    const p = getProvider();
+    const s = await p.getSigner();
     const w = new ethers.Contract(WNAT, ["function deposit() payable", "function withdraw(uint256)"], s);
     const val = ethers.parseEther(walletAmount || "0");
     return isWrap ? w.deposit({ value: val }) : w.withdraw(val);
   });
 
   const handleToPDA = () => execute("Nạp PDA", async () => {
-    const s = await (getProvider()).getSigner();
+    const p = getProvider();
+    const s = await p.getSigner();
     const w = new ethers.Contract(WNAT, ["function transfer(address,uint256)"], s);
     return w.transfer(pdaAddress, ethers.parseEther(walletAmount || "0"));
   });
 
   const handleDelegate = (target, pct = 50) => execute(pct === 0 ? "Hủy" : "Ủy quyền", async () => {
-    const s = await (getProvider()).getSigner();
+    const p = getProvider();
+    const s = await p.getSigner();
     const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, ["function delegate(address,uint256) external"], s);
     return csm.delegate(target, pct * 100);
   });
 
   const handleUndelegateAll = () => execute("Hủy toàn bộ", async () => {
-    const s = await (getProvider()).getSigner();
+    const p = getProvider();
+    const s = await p.getSigner();
     const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, ["function undelegateAll() external"], s);
     return csm.undelegateAll();
   });
@@ -360,7 +384,8 @@ export default function FlarePortal() {
     networkModal: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '20px', textAlign: 'center' },
     pdaBadge: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0a0a0a', color: COLORS.AMBER, padding: '8px 12px', borderRadius: '10px', fontSize: '10px', fontFamily: 'monospace', cursor: 'pointer', border: '1px solid #222', marginTop: '-6px', marginBottom: '15px' },
     logoutBtn: { background: 'transparent', border: `1px solid ${COLORS.BORDER}`, color: COLORS.TEXT_MUTE, borderRadius: '20px', padding: '6px 12px', cursor: 'pointer', fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', transition: 'all 0.2s' },
-    undelegateBtn: { background: 'transparent', color: COLORS.PINK, border: `1px solid ${COLORS.PINK}44`, fontSize: '9px', padding: '4px 8px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }
+    undelegateBtn: { background: 'transparent', color: COLORS.PINK, border: `1px solid ${COLORS.PINK}44`, fontSize: '9px', padding: '4px 8px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' },
+    scanBtn: { display: 'inline-flex', alignItems: 'center', background: '#161616', color: COLORS.TEXT_MUTE, border: `1px solid ${COLORS.BORDER}`, borderRadius: '20px', padding: '6px 12px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase', transition: 'all 0.2s' }
   };
 
   return (
@@ -387,24 +412,36 @@ export default function FlarePortal() {
                <span style={{ color: copied ? COLORS.PRICE_GREEN : COLORS.PINK, fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{account}</span>
                <span style={{ fontSize: '14px' }}>{copied ? "✅" : "📋"}</span>
             </div>
-            <div style={{ fontSize: '10px', color: COLORS.TEXT_MUTE, marginTop: '8px', marginBottom: '25px' }}>{copied ? "Address copied to clipboard!" : "Click the address to copy"}</div>
-            <button onClick={() => setShowQR(false)} style={{ ...styles.btn, background: COLORS.PINK, color: 'white', padding: '12px 40px', borderRadius: '20px' }}>CLOSE</button>
+            <div style={{ fontSize: '10px', color: COLORS.TEXT_MUTE, marginTop: '8px', marginBottom: '25px' }}>{copied ? "Địa chỉ đã được copy!" : "Click vào địa chỉ để copy"}</div>
+            <button onClick={() => setShowQR(false)} style={{ ...styles.btn, background: COLORS.PINK, color: 'white', padding: '12px 40px', borderRadius: '20px' }}>ĐÓNG</button>
         </div>
       )}
 
       <header style={{ textAlign: 'center', marginBottom: '10px', marginTop: '5px' }}>
         <h2 style={{ color: COLORS.PINK, letterSpacing: '3px', margin: 0 }}>OZPRO FLARE <span style={{ fontWeight: 300, color: '#fff' }}>MANAGER </span></h2>
         {account && (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', marginTop: '12px' }}>
-            <div onClick={() => setShowQR(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#161616', padding: '6px 14px', borderRadius: '20px', border: `1px solid ${COLORS.BORDER}`, cursor: 'pointer' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
+            {/* Click vào khu vực ví mở QR Code */}
+            <div onClick={() => setShowQR(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#161616', padding: '6px 14px', borderRadius: '20px', border: `1px solid ${COLORS.BORDER}`, cursor: 'pointer' }}>
               <span style={{ fontSize: '12px', color: COLORS.PINK, fontWeight: 'bold' }}>{account.slice(0, 6)}...{account.slice(-4)}</span>
-              <span style={{ fontSize: '14px' }}> 📲⛆</span>
+              <span style={{ fontSize: '12px' }}>📲</span>
             </div>
+            
+            {/* Nút nhỏ Scan đi tới Flare Explorer */}
+            <button 
+              onClick={() => handleOpenExplorer(account)} 
+              style={styles.scanBtn}
+              onMouseOver={(e) => { e.currentTarget.style.color = COLORS.PRICE_GREEN; e.currentTarget.style.borderColor = COLORS.PRICE_GREEN; }}
+              onMouseOut={(e) => { e.currentTarget.style.color = COLORS.TEXT_MUTE; e.currentTarget.style.borderColor = COLORS.BORDER; }}
+            >
+              🔍 Scan
+            </button>
+
             <button 
               onClick={disconnect} 
               style={styles.logoutBtn}
-              onMouseOver={(e) => { e.target.style.color = COLORS.PINK; e.target.style.borderColor = COLORS.PINK; }}
-              onMouseOut={(e) => { e.target.style.color = COLORS.TEXT_MUTE; e.target.style.borderColor = COLORS.BORDER; }}
+              onMouseOver={(e) => { e.currentTarget.style.color = COLORS.PINK; e.currentTarget.style.borderColor = COLORS.PINK; }}
+              onMouseOut={(e) => { e.currentTarget.style.color = COLORS.TEXT_MUTE; e.currentTarget.style.borderColor = COLORS.BORDER; }}
             >
               Logout
             </button>
@@ -435,7 +472,7 @@ export default function FlarePortal() {
               <div style={{ textAlign: 'right' }}><div style={{ fontSize: 24, fontWeight: '900' }}>{Number(balances.wflr).toLocaleString()} <small style={{ fontSize: 18, color: COLORS.PINK }}> WFLR</small></div><div style={{ fontSize: 12, color: COLORS.TEXT_MUTE }}>{toUSD(balances.wflr)}</div></div>
             </div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-              <input type="number" value={walletAmount} onChange={(e) => setWalletAmount(e.target.value)} style={styles.input} placeholder="Điền số FLR/WFLR vào đây trước..." />
+              <input type="number" value={walletAmount} onChange={(e) => setWalletAmount(e.target.value)} style={styles.input} placeholder="Điền số FLR/WFLR..." />
               <button onClick={() => setWalletAmount(balances.flr)} style={{ ...styles.btn, background: COLORS.PINK, color: 'white' }}>MAX</button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: 8 }}>
@@ -477,7 +514,19 @@ export default function FlarePortal() {
                       <div style={{ fontSize: '10px', color: timeLeft > 0 ? COLORS.TEXT_MUTE : COLORS.AMBER, fontWeight: '800', marginBottom: '4px' }}>{timeLeft > 0 ? "NEXT REWARD CYCLE" : "UNCLAIMED REWARDS"}</div>
                       <div style={{ fontSize: '20px', fontWeight: '900' }}>{timeLeft > 0 ? renderCountdown(timeLeft) : <span style={{ color: COLORS.PRICE_GREEN }}>+{Number(balances.reward).toFixed(2)} FLR</span>}</div>
                     </div>
-                    <button onClick={handleClaim} disabled={Number(balances.reward) <= 0} style={{ ...styles.btn, minWidth: '85px', background: timeLeft > 0 ? "transparent" : COLORS.AMBER, color: timeLeft > 0 ? COLORS.TEXT_MUTE : 'black', border: timeLeft > 0 ? `1px solid ${COLORS.BORDER}` : 'none' }}>{timeLeft > 0 ? "LOCKED" : "CLAIM"}</button>
+                    <button 
+                      onClick={handleClaim} 
+                      disabled={Number(balances.reward) <= 0 || timeLeft > 0} 
+                      style={{ 
+                        ...styles.btn, 
+                        minWidth: '85px', 
+                        background: timeLeft > 0 ? "transparent" : COLORS.AMBER, 
+                        color: timeLeft > 0 ? COLORS.TEXT_MUTE : 'black', 
+                        border: timeLeft > 0 ? `1px solid ${COLORS.BORDER}` : 'none' 
+                      }}
+                    >
+                      {timeLeft > 0 ? "LOCKED" : "CLAIM"}
+                    </button>
                   </div>
                   <div style={{ width: '100%', height: '4px', background: '#222', borderRadius: '10px', marginTop: '12px', overflow: 'hidden' }}>
                     <div style={{ width: `${Math.max(0, 100 - (timeLeft / CYCLE_SECONDS * 100))}%`, height: '100%', background: timeLeft > 0 ? COLORS.PINK : COLORS.PRICE_GREEN, transition: 'width 1s linear' }} />
