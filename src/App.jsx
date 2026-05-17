@@ -368,11 +368,11 @@ export default function FlarePortal() {
     [providerSearch]);
 
   const styles = {
-    container: { boxSizing: 'border-box', padding: "24px", maxWidth: "420px", margin: "20px auto", background: COLORS.DARK, color: "white", borderRadius: "32px", border: `1px solid ${COLORS.BORDER}`, fontFamily: "sans-serif", position: 'relative', overflow: "hidden" },
+    // Đã tích hợp hiệu ứng Glow hồng mờ bao phủ bên ngoài khung App ở dòng box-shadow dưới này
+    container: { boxSizing: 'border-box', padding: "24px", maxWidth: "420px", margin: "40px auto", background: COLORS.DARK, color: "white", borderRadius: "32px", border: `1px solid ${COLORS.BORDER}`, boxShadow: `0 0 40px 10px ${COLORS.PINK}22, 0 0 100px 30px ${COLORS.PINK}0a`, fontFamily: "sans-serif", position: 'relative', overflow: "hidden" },
     card: { boxSizing: 'border-box', background: COLORS.SURFACE, padding: "20px", borderRadius: "24px", marginBottom: "16px", border: "1px solid #1f1f1f" },
     label: { fontSize: "11px", color: COLORS.TEXT_MUTE, fontWeight: "800", letterSpacing: "1px", marginBottom: "12px", textTransform: "uppercase" },
     input: { flex: 1, padding: "12px", borderRadius: "14px", background: "#080808", color: "white", border: "1px solid #222", outline: "none" },
-    // Cấu trúc nút cơ bản chung
     btnBase: { padding: "12px", borderRadius: "14px", border: "1px solid transparent", cursor: "pointer", fontWeight: "bold", fontSize: "12px", transition: "all 0.3s ease" },
     tickerWrap: { width: 'calc(100% + 48px)', overflow: 'hidden', background: '#0a0a0a', borderTop: `1px solid ${COLORS.BORDER}`, borderBottom: `1px solid ${COLORS.BORDER}`, padding: '12px 0', margin: '15px -24px 25px -24px' },
     ticker: { display: 'inline-block', whiteSpace: 'nowrap', animation: 'marquee 50s linear infinite', paddingLeft: '100%' },
@@ -388,7 +388,6 @@ export default function FlarePortal() {
     scanBtn: { display: 'inline-flex', alignItems: 'center', background: '#161616', color: COLORS.TEXT_MUTE, border: `1px solid ${COLORS.BORDER}`, borderRadius: '20px', padding: '6px 12px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', textTransform: 'uppercase', transition: 'all 0.2s' }
   };
 
-  // Hàm tạo style động có hiệu ứng Glow dựa vào mã màu gốc
   const makeGlowEffect = (e, baseColor, isHover, textColor = "white") => {
     if (isHover) {
       e.currentTarget.style.background = "transparent";
@@ -449,7 +448,7 @@ export default function FlarePortal() {
       <header style={{ textAlign: 'center', marginBottom: '10px', marginTop: '5px' }}>
         <h2 style={{ color: COLORS.PINK, letterSpacing: '3px', margin: 0 }}>OZPRO FLARE <span style={{ fontWeight: 300, color: '#fff' }}>MANAGER </span></h2>
         {account && (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
+          <div style={{ display: 'flex', justifycontent: 'center', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
             <div onClick={() => setShowQR(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#161616', padding: '6px 14px', borderRadius: '20px', border: `1px solid ${COLORS.BORDER}`, cursor: 'pointer' }}>
               <span style={{ fontSize: '12px', color: COLORS.PINK, fontWeight: 'bold' }}>{account.slice(0, 6)}...{account.slice(-4)}</span>
               <span style={{ fontSize: '12px' }}>📲</span>
@@ -539,7 +538,7 @@ export default function FlarePortal() {
                 onMouseOver={(e) => makeGlowEffect(e, COLORS.PINK, true, "yellow")}
                 onMouseOut={(e) => {
                   makeGlowEffect(e, COLORS.PINK, false);
-                  e.currentTarget.style.color = "yellow"; // Trả lại màu chữ ban đầu
+                  e.currentTarget.style.color = "yellow";
                 }}
               >
                 NẠP PDA
