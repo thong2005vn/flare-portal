@@ -402,14 +402,14 @@ export default function FlarePortal() {
           const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, ["function accountToDelegationAccount(address) view returns (address)"], p);
           const pda = await csm.accountToDelegationAccount(addr);
           setPdaAddress(pda);
-          setStatus("✅ Đã kết nối Ellipal thành công!");
+          setStatus("✅ Đã kết nối Wallet App thành công!");
 
           setTimeout(() => refreshData(addr, pda, p), 200);
         }
       }, 1000);
     } catch (e) {
       console.error(e);
-      setStatus("❌ Kết nối Ellipal thất bại");
+      setStatus("❌ Kết nối Wallet App thất bại");
     }
   };
 
