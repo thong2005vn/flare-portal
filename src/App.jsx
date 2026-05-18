@@ -66,10 +66,10 @@ const PROVIDERS = [
 // 🌐 CẤU HÌNH WEB3MODAL - SỬA LỖI TREO QR CODE TRÊN VERCEL & LOCALHOST
 const projectId = "60e0395fcb2e23586895a5b421c97875";
 const metadata = {
-  name: "FLARE OZPRO PORTAL",
-  description: "Flare Delegation Account Rewards Manager",
+  name: "OZPRO FLARE PORTAL",
+  description: "Ozpro Flare Delegation Account Rewards Manager",
   // Sử dụng window.location.origin tự động để tránh lệch Domain khi chạy trên Vercel/4G
-  url: typeof window !== "undefined" ? window.location.origin : "http://localhost:5173",
+  url: typeof window !== "undefined" ? window.location.origin : "https://ozpro-flare-portal.vercel.app/",
   icons: ["https://avatars.githubusercontent.com/u/37784886"]
 };
 
@@ -577,7 +577,7 @@ export default function FlarePortal() {
               onMouseOver={(e) => { e.currentTarget.style.borderColor = COLORS.AMBER; e.currentTarget.style.boxShadow = `0 0 10px ${COLORS.AMBER}44`; }}
               onMouseOut={(e) => { e.currentTarget.style.borderColor = '#222'; e.currentTarget.style.boxShadow = 'none'; }}
             >
-              <span>📱 Ellipal App (WalletConnect)</span>
+              <span>📱 Wallet Apps (WalletConnect)</span>
               <span style={{ fontSize: '10px', color: COLORS.TEXT_MUTE }}>QR Code</span>
             </button>
 
