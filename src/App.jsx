@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { ethers } from "ethers";
 import { QRCodeSVG } from "qrcode.react";
-import { createWeb3Modal, defaultConfig } from "@web3modal/ethers/react";
+import { createWeb3Modal, defaultConfig } from "@reown/appkit-ethers/react";
 
 // --- CẤU HÌNH HỆ THỐNG FLARE ---
 const WNAT = "0x1D80c49BbBCd1C0911346656B529DF9E5c2F783d";
