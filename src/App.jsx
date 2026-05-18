@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { ethers } from "ethers";
 import { QRCodeSVG } from "qrcode.react";
+import { createWeb3Modal, defaultConfig } from "@web3modal/ethers/react";
 
 // --- CẤU HÌNH HỆ THỐNG FLARE ---
 const WNAT = "0x1D80c49BbBCd1C0911346656B529DF9E5c2F783d";
@@ -8,7 +9,7 @@ const REWARD_MANAGER = "0xC8f55c5aA2C752eE285Bd872855C749f4ee6239B";
 const CLAIM_SETUP_MANAGER = "0xD56c0Ea37B848939B59e6F5Cda119b3fA473b5eB";
 
 const FLARE_PARAMS = {
-  chainId: "0xe", // 14
+  chainId: 14, 
   chainName: "Flare Mainnet",
   nativeCurrency: { name: "Flare", symbol: "FLR", decimals: 18 },
   rpcUrls: ["https://flare-api.flare.network/ext/C/rpc"],
@@ -62,6 +63,40 @@ const PROVIDERS = [
   { name: "Use Your Spark", address: "0xa288054b230dcbb8689ac229d6dbd7df39203181" }
 ];
 
+// 🌐 CẤU HÌNH WEB3MODAL - SỬA LỖI TREO QR CODE TRÊN VERCEL & LOCALHOST
+const projectId = "60e0395fcb2e23586895a5b421c97875";
+const metadata = {
+  name: "FLARE OZPRO PORTAL",
+  description: "Flare Delegation Account Rewards Manager",
+  // Sử dụng window.location.origin tự động để tránh lệch Domain khi chạy trên Vercel/4G
+  url: typeof window !== "undefined" ? window.location.origin : "http://localhost:5173",
+  icons: ["https://avatars.githubusercontent.com/u/37784886"]
+};
+
+const flareNetworkConfig = {
+  chainId: FLARE_PARAMS.chainId,
+  name: FLARE_PARAMS.chainName,
+  currency: "FLR",
+  explorerUrl: FLARE_PARAMS.blockExplorerUrls[0],
+  rpcUrl: FLARE_PARAMS.rpcUrls[0]
+};
+
+const modal = createWeb3Modal({
+  ethersConfig: defaultConfig({ 
+    metadata,
+    enableEIP6963: true,
+    enableInjected: true,
+    enableCoinbase: false
+  }),
+  chains: [flareNetworkConfig],
+  projectId,
+  enableAnalytics: false,
+  themeMode: 'dark',
+  themeVariables: {
+    '--w3m-z-index': '9999'
+  }
+});
+
 export default function FlarePortal() {
   const [account, setAccount] = useState("");
   const [pdaAddress, setPdaAddress] = useState("");
@@ -80,19 +115,30 @@ export default function FlarePortal() {
   const [showNetworkModal, setShowNetworkModal] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
 
+  // --- QUẢN LÝ VÍ ---
+  const [walletType, setWalletType] = useState(""); 
+  const [customEthersProvider, setCustomEthersProvider] = useState(null);
+  const [showConnectModal, setShowConnectModal] = useState(false); 
+
   const dropdownRef = useRef(null);
   const CYCLE_SECONDS = 3.5 * 24 * 3600;
 
   const getProvider = useCallback(() => {
-    if (!window.ethereum) return null;
-    return new ethers.BrowserProvider(window.ethereum);
-  }, []);
+    if (walletType === "metamask" && window.ethereum) {
+      return new ethers.BrowserProvider(window.ethereum);
+    }
+    if (walletType === "walletconnect" && customEthersProvider) {
+      return customEthersProvider;
+    }
+    return null;
+  }, [walletType, customEthersProvider]);
 
   const ensureFlareNetwork = async () => {
+    if (walletType === "walletconnect") return true; 
     if (!window.ethereum) return false;
     try {
       const chainId = await window.ethereum.request({ method: "eth_chainId" });
-      if (chainId !== FLARE_PARAMS.chainId) {
+      if (chainId !== "0xe") {
         setShowNetworkModal(true);
         return false;
       }
@@ -108,7 +154,7 @@ export default function FlarePortal() {
     try {
       await window.ethereum.request({
         method: "wallet_switchEthereumChain",
-        params: [{ chainId: FLARE_PARAMS.chainId }],
+        params: [{ chainId: "0xe" }],
       });
       setShowNetworkModal(false);
     } catch (err) {
@@ -116,7 +162,13 @@ export default function FlarePortal() {
         try {
           await window.ethereum.request({
             method: "wallet_addEthereumChain",
-            params: [FLARE_PARAMS],
+            params: [{
+              chainId: "0xe",
+              chainName: FLARE_PARAMS.chainName,
+              nativeCurrency: FLARE_PARAMS.nativeCurrency,
+              rpcUrls: FLARE_PARAMS.rpcUrls,
+              blockExplorerUrls: FLARE_PARAMS.blockExplorerUrls
+            }],
           });
           setShowNetworkModal(false);
         } catch (addErr) {
@@ -178,9 +230,13 @@ export default function FlarePortal() {
         const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`);
         const data = await res.json();
         setPrices({
-          btc: data["bitcoin"].usd, eth: data["ethereum"].usd, xrp: data["ripple"].usd,
-          flr: data["flare-networks"].usd, sgb: data["songbird"].usd,
-          ltc: data["litecoin"].usd, doge: data["dogecoin"].usd
+          btc: data["bitcoin"]?.usd || 0, 
+          eth: data["ethereum"]?.usd || 0, 
+          xrp: data["ripple"]?.usd || 0,
+          flr: data["flare-networks"]?.usd || 0, 
+          sgb: data["songbird"]?.usd || 0,
+          ltc: data["litecoin"]?.usd || 0, 
+          doge: data["dogecoin"]?.usd || 0
         });
       } catch (e) { console.error(e); }
     };
@@ -199,9 +255,9 @@ export default function FlarePortal() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const refreshData = useCallback(async (addr, pda) => {
+  const refreshData = useCallback(async (addr, pda, explicitProvider = null) => {
     if (!addr || !pda) return;
-    const p = getProvider();
+    const p = explicitProvider || getProvider();
     if (!p) return;
     try {
       let activated = false;
@@ -270,24 +326,101 @@ export default function FlarePortal() {
     }
   };
 
-  const connect = async () => {
+  // --- 🦊 LUỒNG METAMASK ---
+  const connectMetaMask = async () => {
     if (!window.ethereum) return alert("Cài MetaMask!");
-    const isOk = await ensureFlareNetwork();
-    if (!isOk) return;
+    setWalletType("metamask");
+    setShowConnectModal(false);
     try {
-      const p = getProvider();
-      if (!p) return;
+      const chainId = await window.ethereum.request({ method: "eth_chainId" });
+      if (chainId !== "0xe") {
+        setShowNetworkModal(true);
+        return;
+      }
       const accs = await window.ethereum.request({ method: "eth_requestAccounts" });
+      const addr = accs[0];
+      setAccount(addr);
+
+      const p = new ethers.BrowserProvider(window.ethereum);
       const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, ["function accountToDelegationAccount(address) view returns (address)"], p);
-      const pda = await csm.accountToDelegationAccount(accs[0]);
-      setAccount(accs[0]); setPdaAddress(pda);
-      refreshData(accs[0], pda);
-    } catch (e) { console.error(e); }
+      const pda = await csm.accountToDelegationAccount(addr);
+      setPdaAddress(pda);
+      setStatus("✅ Đã kết nối ví MetaMask");
+
+      setTimeout(() => refreshData(addr, pda, p), 200);
+    } catch (err) {
+      console.error(err);
+      setStatus("❌ Kết nối thất bại");
+    }
   };
 
-  const disconnect = () => {
+  useEffect(() => {
+    if (walletType !== "metamask" || !window.ethereum) return;
+    const handleAccountsChanged = async (newAccs) => {
+      if (newAccs.length === 0) disconnect();
+      else {
+        const addr = newAccs[0];
+        setAccount(addr);
+        const p = new ethers.BrowserProvider(window.ethereum);
+        const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, ["function accountToDelegationAccount(address) view returns (address)"], p);
+        const pda = await csm.accountToDelegationAccount(addr);
+        setPdaAddress(pda);
+        refreshData(addr, pda, p);
+      }
+    };
+    const handleChainChanged = () => window.location.reload();
+    window.ethereum.on("accountsChanged", handleAccountsChanged);
+    window.ethereum.on("chainChanged", handleChainChanged);
+    return () => {
+      window.ethereum.removeListener("accountsChanged", handleAccountsChanged);
+      window.ethereum.removeListener("chainChanged", handleChainChanged);
+    };
+  }, [walletType, refreshData]);
+
+  // --- 📱 LUỒNG WALLETCONNECT ÉP BUỘC GENERATE QR ---
+  const connectEllipal = async () => {
+    try {
+      setStatus("⏳ Đang kết nối Web3Modal...");
+      setShowConnectModal(false); 
+      
+      // Sử dụng phương thức open trực tiếp với cấu hình view quét mã QR
+      await modal.open({ view: 'Connect' });
+
+      const checkConnection = setInterval(async () => {
+        if (modal.getIsConnected()) {
+          clearInterval(checkConnection);
+          
+          const walletProvider = modal.getWalletProvider();
+          const p = new ethers.BrowserProvider(walletProvider);
+          const signer = await p.getSigner();
+          const addr = await signer.getAddress();
+
+          setWalletType("walletconnect");
+          setCustomEthersProvider(p);
+          setAccount(addr);
+
+          const csm = new ethers.Contract(CLAIM_SETUP_MANAGER, ["function accountToDelegationAccount(address) view returns (address)"], p);
+          const pda = await csm.accountToDelegationAccount(addr);
+          setPdaAddress(pda);
+          setStatus("✅ Đã kết nối Ellipal thành công!");
+
+          setTimeout(() => refreshData(addr, pda, p), 200);
+        }
+      }, 1000);
+    } catch (e) {
+      console.error(e);
+      setStatus("❌ Kết nối Ellipal thất bại");
+    }
+  };
+
+  const disconnect = async () => {
+    if (walletType === "walletconnect") {
+      try { await modal.disconnect(); } catch (e) { console.error(e); }
+    }
     setAccount("");
     setPdaAddress("");
+    setWalletType("");
+    setCustomEthersProvider(null);
     setIsActivated(false);
     setBalances({ flr: "0", wflr: "0", pdaWflr: "0", reward: "0" });
     setDelegations([]);
@@ -423,6 +556,36 @@ export default function FlarePortal() {
         </div>
       )}
 
+      {showConnectModal && (
+        <div style={styles.networkModal} onClick={() => setShowConnectModal(false)}>
+          <div style={{ background: COLORS.SURFACE, border: `1px solid ${COLORS.BORDER}`, padding: '25px', borderRadius: '24px', width: '320px' }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 20px 0', fontSize: '14px', letterSpacing: '1px', color: '#fff' }}>CHỌN PHƯƠNG THỨC KẾT NỐI</h3>
+            
+            <button 
+              onClick={connectMetaMask} 
+              style={{ ...styles.btnBase, background: '#161616', color: 'white', width: '100%', padding: '14px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid #222' }}
+              onMouseOver={(e) => { e.currentTarget.style.borderColor = COLORS.PINK; e.currentTarget.style.boxShadow = `0 0 10px ${COLORS.PINK}44`; }}
+              onMouseOut={(e) => { e.currentTarget.style.borderColor = '#222'; e.currentTarget.style.boxShadow = 'none'; }}
+            >
+              <span>🦊 MetaMask (Extension)</span>
+              <span style={{ fontSize: '10px', color: COLORS.TEXT_MUTE }}>Browser</span>
+            </button>
+
+            <button 
+              onClick={connectEllipal} 
+              style={{ ...styles.btnBase, background: '#161616', color: 'white', width: '100%', padding: '14px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid #222' }}
+              onMouseOver={(e) => { e.currentTarget.style.borderColor = COLORS.AMBER; e.currentTarget.style.boxShadow = `0 0 10px ${COLORS.AMBER}44`; }}
+              onMouseOut={(e) => { e.currentTarget.style.borderColor = '#222'; e.currentTarget.style.boxShadow = 'none'; }}
+            >
+              <span>📱 Ellipal App (WalletConnect)</span>
+              <span style={{ fontSize: '10px', color: COLORS.TEXT_MUTE }}>QR Code</span>
+            </button>
+
+            <div onClick={() => setShowConnectModal(false)} style={{ fontSize: '12px', color: COLORS.TEXT_MUTE, cursor: 'pointer', textDecoration: 'underline' }}>Đóng</div>
+          </div>
+        </div>
+      )}
+
       {showQR && (
         <div style={styles.qrOverlay} onClick={() => setShowQR(false)}>
             <div style={styles.qrContainer} onClick={(e) => e.stopPropagation()}>
@@ -488,12 +651,12 @@ export default function FlarePortal() {
 
       {!account ? (
         <button 
-          onClick={connect} 
+          onClick={() => setShowConnectModal(true)} 
           style={{ ...styles.btnBase, width: '100%', background: COLORS.PINK, color: 'white', padding: '18px' }}
           onMouseOver={(e) => makeGlowEffect(e, COLORS.PINK, true)}
           onMouseOut={(e) => makeGlowEffect(e, COLORS.PINK, false)}
         >
-          KẾT NỐI VÍ METAMASK
+          KẾT NỐI VÍ CỦA BẠN
         </button>
       ) : (
         <>
